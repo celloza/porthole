@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Porthole.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Porthole.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

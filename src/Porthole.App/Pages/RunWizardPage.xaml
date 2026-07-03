@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="Porthole_App.Pages.RunWizardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel Padding="24,20,24,32" Spacing="16">
+        <TextBlock Opacity="0.72" Text="Run Wizard is under active development. You will be able to configure image, ports, mounts, and runtime options from a guided flow." TextWrapping="WrapWholeWords" />
+        <TextBlock Opacity="0.72" Text="For now, start containers from the Containers page or with wslc commands in a terminal." TextWrapping="WrapWholeWords" />
+    </StackPanel>
+</Page>

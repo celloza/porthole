@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="Porthole_App.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer>
+        <StackPanel Padding="24,20,24,32" Spacing="20">
+            <TextBlock Opacity="0.72" Text="Porthole manages a dedicated WSL Containers session and surfaces readiness before any runtime actions." TextWrapping="WrapWholeWords" />
+
+            <InfoBar
+                IsOpen="{x:Bind ViewModel.IsPrereleaseUpdateRequired, Mode=OneWay}"
+                IsClosable="False"
+                Severity="Warning"
+                Title="WSL Containers prerequisites are incomplete"
+                Message="{x:Bind ViewModel.MissingComponentsMessage, Mode=OneWay}">
+                <InfoBar.ActionButton>
+                    <Button Content="Run wsl --update --pre-release" />
+                </InfoBar.ActionButton>
+            </InfoBar>
+
+            <Border Padding="18" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="16">
+                <Grid RowSpacing="6">
+                    <ProgressRing
+                        Width="28"
+                        Height="28"
+                        IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top" />
+                    <StackPanel Spacing="4">
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="Session bootstrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SymbolIcon Symbol="Globe" />
+                            <TextBlock Opacity="0.72" Text="{x:Bind ViewModel.SessionStatus, Mode=OneWay}" TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid ColumnSpacing="16" RowSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Padding="18" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Opacity="0.72" Text="Container VM CPU" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="{x:Bind ViewModel.CpuUsageText, Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Padding="18" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Opacity="0.72" Text="Container VM Memory" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="{x:Bind ViewModel.MemoryUsageText, Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Padding="18" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Opacity="0.72" Text="Container Summary" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="{x:Bind ViewModel.ContainerSummaryText, Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Padding="18" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="16">
+                <StackPanel Spacing="8">
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="How to use this dashboard" />
+                    <TextBlock Opacity="0.72" Text="Use this page to monitor session health and runtime load. Open Images to manage your local cache and pull new images, or open Containers to start, stop, and inspect workloads." TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
