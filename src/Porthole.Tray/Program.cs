@@ -39,10 +39,11 @@ internal static class Program
 			_menu.Items.Add("Open dashboard", null, (_, _) => LaunchDashboard());
 			_menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
+			var trayIcon = LoadTrayIcon();
 			_notifyIcon = new NotifyIcon
 			{
 				Text = "Porthole",
-				Icon = SystemIcons.Application,
+				Icon = trayIcon ?? SystemIcons.Application,
 				Visible = true,
 				ContextMenuStrip = _menu,
 			};
@@ -59,6 +60,12 @@ internal static class Program
 			_imageServer.Dispose();
 			base.ExitThreadCore();
 		}
+	}
+
+	private static Icon? LoadTrayIcon()
+	{
+		string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+		return File.Exists(iconPath) ? new Icon(iconPath, 16, 16) : null;
 	}
 
 	private static void LaunchDashboard()
