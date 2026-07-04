@@ -1,4 +1,8 @@
-# Porthole
+
+<div align="center">
+![My Logo](assets/portholelogowithname.svg#gh-light-mode-only)
+![My Logo](assets/portholelogowithname-dark.svg#gh-dark-mode-only)
+</div>
 
 Porthole is a native Windows desktop dashboard for WSL Containers.
 
