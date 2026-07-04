@@ -1,4 +1,7 @@
-<br />
+<div>
+  <br />
+  <br />
+</div>
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/portholelogowithname-dark.svg">
