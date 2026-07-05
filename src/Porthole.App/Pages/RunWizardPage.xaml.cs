@@ -254,7 +254,7 @@ public sealed partial class RunWizardPage : Page
 
         foreach (char ch in input.ToLowerInvariant())
         {
-            bool isValid = char.IsLetterOrDigit(ch) || ch == '-' || ch == '_';
+            bool isValid = char.IsLetterOrDigit(ch) || ch == '-';
             if (isValid)
             {
                 sb.Append(ch);
