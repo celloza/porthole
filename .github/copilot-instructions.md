@@ -116,6 +116,8 @@ The solution currently has three main projects:
 - Do not replace named-pipe integration with direct UI-to-SDK calls.
 - Do not regress tray behavior: tray startup, tray double-click, and existing-window activation should keep working.
 - When changing image operations, verify both the UI flow and the tray backend flow.
+- If the Run Wizard template JSON schema changes, increment the template `version` value.
+- Template loading must remain backward compatible with previously saved template versions.
 
 ## Useful validation paths
 
