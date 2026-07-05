@@ -11,6 +11,7 @@ public sealed class NamedPipeImageCatalogService : IImageCatalogService
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan IdleResponseTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan PullResponseTimeout = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CreateContainerResponseTimeout = TimeSpan.FromMinutes(2);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -109,9 +110,12 @@ public sealed class NamedPipeImageCatalogService : IImageCatalogService
 
         using var writer = new StreamWriter(pipe, Utf8NoBom, leaveOpen: true);
         using var reader = new StreamReader(pipe, Utf8NoBom, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-        TimeSpan responseTimeout = request.Operation == ImageCatalogOperation.Pull
-            ? PullResponseTimeout
-            : IdleResponseTimeout;
+        TimeSpan responseTimeout = request.Operation switch
+        {
+            ImageCatalogOperation.Pull => PullResponseTimeout,
+            ImageCatalogOperation.CreateContainer => CreateContainerResponseTimeout,
+            _ => IdleResponseTimeout,
+        };
 
         await WaitAsync(
             writer.WriteLineAsync(JsonSerializer.Serialize(new ImageCatalogResponse(ImageCatalogMessageKind.Request, Message: JsonSerializer.Serialize(request, JsonOptions)), JsonOptions)),

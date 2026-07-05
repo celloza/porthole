@@ -233,6 +233,7 @@
                                     Text="{x:Bind ViewModel.NewPortMapping, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <Button
                                     Grid.Column="1"
+                                    AutomationProperties.Name="Add port mapping"
                                     Command="{x:Bind ViewModel.AddPortMappingCommand}">
                                     <FontIcon FontSize="12" Glyph="&#xE710;" />
                                 </Button>
@@ -261,6 +262,7 @@
                                                 Height="24"
                                                 MinWidth="0"
                                                 Padding="0"
+                                                AutomationProperties.Name="Remove port mapping"
                                                 Click="RemovePortMappingButton_Click"
                                                 Tag="{x:Bind}">
                                                 <FontIcon FontSize="10" Glyph="&#xE711;" />
@@ -289,6 +291,7 @@
                                     Text="{x:Bind ViewModel.NewEnvironmentVariable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <Button
                                     Grid.Column="1"
+                                    AutomationProperties.Name="Add environment variable"
                                     Command="{x:Bind ViewModel.AddEnvironmentVariableCommand}">
                                     <FontIcon FontSize="12" Glyph="&#xE710;" />
                                 </Button>
@@ -317,6 +320,7 @@
                                                 Height="24"
                                                 MinWidth="0"
                                                 Padding="0"
+                                                AutomationProperties.Name="Remove environment variable"
                                                 Click="RemoveEnvVarButton_Click"
                                                 Tag="{x:Bind}">
                                                 <FontIcon FontSize="10" Glyph="&#xE711;" />
@@ -345,6 +349,7 @@
                                     Text="{x:Bind ViewModel.NewVolumeMount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <Button
                                     Grid.Column="1"
+                                    AutomationProperties.Name="Add volume mount"
                                     Command="{x:Bind ViewModel.AddVolumeMountCommand}">
                                     <FontIcon FontSize="12" Glyph="&#xE710;" />
                                 </Button>
@@ -373,6 +378,7 @@
                                                 Height="24"
                                                 MinWidth="0"
                                                 Padding="0"
+                                                AutomationProperties.Name="Remove volume mount"
                                                 Click="RemoveVolumeMountButton_Click"
                                                 Tag="{x:Bind}">
                                                 <FontIcon FontSize="10" Glyph="&#xE711;" />

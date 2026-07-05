@@ -779,8 +779,43 @@ internal sealed class WslcBackendService : IDisposable
 
     private static string EscapeCliArgument(string value)
     {
-        string escaped = value.Replace("\"", "\\\"");
-        return $"\"{escaped}\"";
+        var escaped = new System.Text.StringBuilder(value.Length + 2);
+        escaped.Append('"');
+
+        int backslashCount = 0;
+        foreach (char ch in value)
+        {
+            if (ch == '\\')
+            {
+                backslashCount++;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                escaped.Append('\\', backslashCount * 2 + 1);
+                escaped.Append('"');
+                backslashCount = 0;
+                continue;
+            }
+
+            if (backslashCount > 0)
+            {
+                escaped.Append('\\', backslashCount);
+                backslashCount = 0;
+            }
+
+            escaped.Append(ch);
+        }
+
+        if (backslashCount > 0)
+        {
+            // Trailing backslashes must be doubled before the closing quote.
+            escaped.Append('\\', backslashCount * 2);
+        }
+
+        escaped.Append('"');
+        return escaped.ToString();
     }
 
     private static IReadOnlyList<string> SplitCommandLineArguments(string commandLine)
