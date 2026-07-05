@@ -45,8 +45,7 @@ jobs:
             exit 1
           }
 
-          git fetch origin main
-          git fetch --tags origin
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --tags --force
 
           $targetSha = (git rev-list -n 1 $tag)
           if ([string]::IsNullOrWhiteSpace($targetSha)) {
@@ -54,7 +53,10 @@ jobs:
             exit 1
           }
 
-          if (-not (git merge-base --is-ancestor $targetSha origin/main)) {
+          # `git merge-base --is-ancestor` signals via exit code and prints no stdout,
+          # so rely on $LASTEXITCODE instead of PowerShell boolean coercion.
+          git merge-base --is-ancestor $targetSha origin/main
+          if ($LASTEXITCODE -ne 0) {
             Write-Error "The release tag commit is not contained in origin/main. Tag from main to release."
             exit 1
           }
