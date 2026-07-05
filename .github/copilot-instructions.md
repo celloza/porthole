@@ -48,6 +48,17 @@ The solution currently has three main projects:
 - If you add or change an operation, update both the client and server sides together.
 - Preserve typed progress reporting for long-running operations such as image pulls.
 
+**Operation Codes:**
+- Image operations (0-19): List, Pull, Delete, Tag, Prune
+- Session operations (20-24): ListSessions, CreateSession, DeleteSession, SetActiveSession, GetActiveSession
+- Networking operations (30-31): GetNetworkingSnapshot, SetNetworkMode
+
+**Async Operations:**
+- Long-running operations like `PullImage` use `ExecuteWithTimeoutAsync` and yield progress updates
+- Synchronous-looking operations like `DeleteImage` complete without progress tracking
+- Port binding enumeration (`GetNetworkingSnapshot`) is async to handle JSON parsing and multiple container inspections
+- Always await async operations in pipe server handlers; use `cancellationToken` for timeout safety
+
 ## UI and MVVM expectations
 
 - Use `CommunityToolkit.Mvvm` patterns for viewmodels and commands.
@@ -76,13 +87,22 @@ The solution currently has three main projects:
 
 ## Current implementation status
 
-- Shell/navigation: implemented.
-- Home/dashboard page: implemented.
-- Images page: implemented and backed by the tray host through named pipes.
-- Containers page: still mostly a placeholder.
-- Run Wizard page: still a placeholder.
-- Settings page: placeholder/lightweight.
-- Image prune support is currently limited by the SDK surface used in the tray backend.
+**Implemented:**
+- ✅ Shell/navigation: full page routing and menu structure
+- ✅ Dashboard page: real-time system metrics and container status
+- ✅ Images page: pull, tag, delete with progress tracking
+- ✅ Containers page: start, stop, remove with inspection
+- ✅ **Sessions page**: multi-session management with create/switch/delete operations
+- ✅ **Networking page**: network mode toggle, port binding display, proxy configuration
+- ⏳ Settings page: placeholder/lightweight
+- ⏳ Run Wizard page: planned for next iteration
+
+**Architectural Patterns in Use:**
+- Multi-session support: All container operations target the active session context (set via `_activeSessionName` in backend)
+- Session storage: WSL Containers SDK manages session filesystem; `_sessionSettings` dict tracks name→path mapping as workaround for Session.Settings not being exposed
+- Port binding enumeration: Iterates running containers (State=2), calls `wslc inspect <name>` for each, parses Ports JSON object
+- Network mode: Toggle between Bridge and Consomme stored in `_networkMode` field; persists only during tray session lifetime
+- Proxy detection: Reads from Windows environment variables (HTTP_PROXY, HTTPS_PROXY, NO_PROXY) on demand
 
 ## WSL and prerequisites
 
@@ -105,7 +125,38 @@ The solution currently has three main projects:
 
 ## When extending the app
 
+### General Pattern
+
 - For new container or image actions, start with shared contracts and service interfaces in `Porthole.Core`.
 - Implement backend behavior in `Porthole.Tray`.
 - Expose the operation to the dashboard through the named-pipe client.
 - Keep the WinUI layer focused on presentation, command flow, and status feedback.
+
+### Multi-Session Operations
+
+When adding features that operate on containers or images:
+
+1. Backend methods should use `GetActiveSessionInstance()` to get the current session context
+2. Verify container/image state checks use correct enum values (e.g., State=2 for Running, not State=1)
+3. All session-aware operations must go through the active session, not a static/singleton instance
+4. When listing resources (containers, images, volumes), they are automatically scoped to the active session
+
+### Port Binding Enumeration Pattern
+
+When discovering port bindings or other container metadata:
+
+1. Get list of containers via `wslc list --all --format json` (already provides basic info and state)
+2. For detailed inspection (ports, mounts, network config), call `wslc inspect <container-name>` which returns array with one element
+3. Parse JSON carefully:
+   - Container `Ports` field is object: `{"80/tcp": [{"HostPort": "8080"}]}`
+   - Extract protocol from key (e.g., "80/tcp" → containerPort=80, protocol="tcp")
+   - Array value contains HostPort string that must be parsed as int
+4. Return results as strongly-typed records (e.g., `PortBinding`) for UI binding
+
+### Session Context Management
+
+- Active session name is tracked in `_activeSessionName` (backend state)
+- When creating/switching sessions, create new Session instance and store in `_sessions` dictionary
+- Session.Settings is not exposed by SDK → use `_sessionSettings` dictionary to track name→storagePath mappings
+- Session lifetime: Created on demand when referenced, persists until deleted
+- **Limitation**: Active session resets when tray restarts (session name is not persisted to disk)
