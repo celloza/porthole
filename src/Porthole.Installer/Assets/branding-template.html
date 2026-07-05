@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f2f6fb;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    #dialog {
+      width: 493px;
+      height: 312px;
+      background: radial-gradient(circle at 10% 20%, #e8f4ff 0%, #ffffff 60%);
+      border: 1px solid #d9e5f2;
+      box-sizing: border-box;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #dialog img {
+      position: absolute;
+      left: 18px;
+      top: 33%;
+      transform: translateY(-50%);
+      width: auto;
+      height: auto;
+      max-width: 46%;
+      max-height: 40%;
+      object-fit: contain;
+    }
+
+    #banner {
+      margin-top: 16px;
+      width: 493px;
+      height: 58px;
+      background: linear-gradient(90deg, #f4f8fc 0%, #ffffff 100%);
+      border: 1px solid #d9e5f2;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+      overflow: hidden;
+    }
+
+    #banner img {
+      width: 28px;
+      height: 28px;
+    }
+  </style>
+</head>
+<body>
+  <div id="dialog">
+    <img src="../../../assets/portholelogowithname.svg" alt="Porthole" />
+  </div>
+  <div id="banner">
+    <img src="../../../assets/portholelogo.svg" alt="Porthole icon" />
+  </div>
+</body>
+</html>

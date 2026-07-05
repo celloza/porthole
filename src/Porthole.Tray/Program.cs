@@ -96,10 +96,12 @@ internal static class Program
 
 	private static string? ResolveDashboardPath()
 	{
-		string localCandidate = Path.Combine(AppContext.BaseDirectory, "Porthole.App.exe");
-		if (File.Exists(localCandidate))
+		foreach (string candidate in GetDashboardPathCandidates())
 		{
-			return localCandidate;
+			if (File.Exists(candidate))
+			{
+				return candidate;
+			}
 		}
 
 		string? repositoryRoot = FindRepositoryRoot();
@@ -123,6 +125,16 @@ internal static class Program
 			.ThenByDescending(path => path.Contains($"{Path.DirectorySeparatorChar}{architectureSegment}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
 			.ThenByDescending(path => File.GetLastWriteTimeUtc(path))
 			.FirstOrDefault();
+	}
+
+	private static IEnumerable<string> GetDashboardPathCandidates()
+	{
+		string baseDirectory = AppContext.BaseDirectory;
+		yield return Path.Combine(baseDirectory, "Porthole.App.exe");
+
+		// Installed MSI layout places tray and dashboard in sibling folders: ...\Porthole\Tray and ...\Porthole\App
+		yield return Path.GetFullPath(Path.Combine(baseDirectory, "..", "App", "Porthole.App.exe"));
+		yield return Path.GetFullPath(Path.Combine(baseDirectory, "..", "Porthole.App.exe"));
 	}
 
 	private static string? FindRepositoryRoot()
