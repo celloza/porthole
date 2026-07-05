@@ -109,6 +109,8 @@ public partial class ImagesViewModel : ObservableObject
         OnPropertyChanged(nameof(ImageCountLabel));
         OnPropertyChanged(nameof(SelectedImageTitle));
         OnPropertyChanged(nameof(SelectedImageSubtitle));
+        
+        ActionStatus = $"Loaded {images.Count} cached image records.";
     }
 
     [RelayCommand]
