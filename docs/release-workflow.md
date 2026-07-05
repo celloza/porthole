@@ -40,7 +40,8 @@ The MSI now prompts users for two post-install behaviors:
 The workflow supports two triggers:
 
 1. GitHub Release publish (recommended)
-    - Triggered when a release is published or prereleased in GitHub.
+   - Triggered when a release is published in GitHub.
+   - This includes prerelease publications, so only one run is created per release.
     - The release's tag is used to derive build metadata and output MSI naming.
     - Example tags:
        - Stable: `v1.2.3`
