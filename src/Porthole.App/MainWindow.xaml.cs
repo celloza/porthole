@@ -81,6 +81,14 @@ public sealed partial class MainWindow : Window
                     ViewModel.SetSection("Containers");
                     NavFrame.Navigate(typeof(ContainersPage));
                     break;
+                case "sessions":
+                    ViewModel.SetSection("Sessions");
+                    NavFrame.Navigate(typeof(SessionsPage));
+                    break;
+                case "networking":
+                    ViewModel.SetSection("Networking");
+                    NavFrame.Navigate(typeof(NetworkingPage));
+                    break;
                 case "run-wizard":
                     ViewModel.SetSection("Run Wizard");
                     NavFrame.Navigate(typeof(RunWizardPage));

@@ -22,7 +22,199 @@ internal sealed class WslcBackendService : IDisposable
         "Sessions");
 
     private readonly object _syncLock = new();
-    private Session? _session;
+    private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _sessionSettings = new(StringComparer.OrdinalIgnoreCase); // name -> storagePath
+    private string _activeSessionName = "Porthole";
+    private NetworkMode _networkMode = NetworkMode.Bridge;
+
+    public IReadOnlyList<SessionSummary> ListSessions()
+    {
+        lock (_syncLock)
+        {
+            return _sessions.Keys
+                .Select(name => new SessionSummary(
+                    name,
+                    _sessionSettings.TryGetValue(name, out string? path) ? path : string.Empty,
+                    string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+    }
+
+    public void CreateNamedSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (_sessions.ContainsKey(name))
+            {
+                return;
+            }
+
+            var settings = CreateDefaultSessionSettings(name);
+            var session = new Session(settings);
+            session.Start();
+            _sessions[name] = session;
+            _sessionSettings[name] = settings.StoragePath;
+        }
+    }
+
+    public void DeleteNamedSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot delete the active session '{name}'. Switch to another session first.");
+            }
+
+            if (_sessions.TryGetValue(name, out Session? session))
+            {
+                _sessions.Remove(name);
+                _sessionSettings.Remove(name);
+                try { session.Terminate(); } catch { }
+                session.Dispose();
+            }
+        }
+    }
+
+    public void SetActiveSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (!_sessions.ContainsKey(name))
+            {
+                CreateNamedSession(name);
+            }
+
+            _activeSessionName = name;
+        }
+    }
+
+    public string GetActiveSessionName()
+    {
+        lock (_syncLock)
+        {
+            return _activeSessionName;
+        }
+    }
+
+    public async Task<NetworkingSnapshot> GetNetworkingSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        string? httpProxy = Environment.GetEnvironmentVariable("HTTP_PROXY")
+            ?? Environment.GetEnvironmentVariable("http_proxy");
+        string? httpsProxy = Environment.GetEnvironmentVariable("HTTPS_PROXY")
+            ?? Environment.GetEnvironmentVariable("https_proxy");
+        string? noProxy = Environment.GetEnvironmentVariable("NO_PROXY")
+            ?? Environment.GetEnvironmentVariable("no_proxy");
+
+        NetworkMode mode;
+        IReadOnlyList<PortBinding> portBindings;
+
+        lock (_syncLock)
+        {
+            mode = _networkMode;
+        }
+
+        try
+        {
+            portBindings = await EnumeratePortBindingsAsync(cancellationToken);
+        }
+        catch
+        {
+            portBindings = [];
+        }
+
+        return new NetworkingSnapshot(
+            mode,
+            portBindings,
+            new ProxyConfiguration(httpProxy, httpsProxy, noProxy));
+    }
+
+    private async Task<IReadOnlyList<PortBinding>> EnumeratePortBindingsAsync(CancellationToken cancellationToken)
+    {
+        var bindings = new List<PortBinding>();
+
+        try
+        {
+            // Get list of running containers
+            IReadOnlyList<ContainerListItem> containers = await GetContainersAsync(cancellationToken);
+
+            // For each running container, inspect it to get port bindings
+            foreach (ContainerListItem container in containers)
+            {
+                if (container.State != 2)
+                {
+                    // Skip non-running containers (State 2 = running)
+                    continue;
+                }
+
+                try
+                {
+                    string json = await RunWslcCommandAsync($"inspect {container.Name}", cancellationToken);
+                    using JsonDocument doc = JsonDocument.Parse(json);
+
+                    // wslc inspect returns an array with one element
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
+                    {
+                        JsonElement containerElem = doc.RootElement[0];
+                        string? containerId = containerElem.GetProperty("Id").GetString();
+                        string? containerName = containerElem.GetProperty("Name").GetString();
+
+                        // Extract port mappings from Ports property (top-level on container)
+                        if (containerElem.TryGetProperty("Ports", out JsonElement ports)
+                            && ports.ValueKind == JsonValueKind.Object)
+                        {
+                            foreach (JsonProperty portMapping in ports.EnumerateObject())
+                            {
+                                // Format: "80/tcp" -> parse the container port
+                                string[] parts = portMapping.Name.Split('/');
+                                if (parts.Length == 2
+                                    && int.TryParse(parts[0], out int containerPort))
+                                {
+                                    string protocol = parts[1];
+
+                                    // Extract host port from bindings array
+                                    if (portMapping.Value.ValueKind == JsonValueKind.Array
+                                        && portMapping.Value.GetArrayLength() > 0)
+                                    {
+                                        JsonElement firstBinding = portMapping.Value[0];
+                                        if (firstBinding.TryGetProperty("HostPort", out JsonElement hostPortElem)
+                                            && int.TryParse(hostPortElem.GetString(), out int hostPort))
+                                        {
+                                            bindings.Add(new PortBinding(
+                                                containerId ?? "unknown",
+                                                containerName ?? "unknown",
+                                                hostPort,
+                                                containerPort,
+                                                protocol));
+                                        }
+                                    }
+                                }
+                            }
+                    }
+                }
+                }
+                catch
+                {
+                    // Skip containers that fail to inspect
+                }
+            }
+        }
+        catch
+        {
+            // If enumerate fails, return empty list
+        }
+
+        return bindings;
+    }
+
+    public void SetNetworkMode(NetworkMode mode)
+    {
+        lock (_syncLock)
+        {
+            _networkMode = mode;
+        }
+    }
 
     public SessionSettings CreateDefaultSessionSettings(string sessionName)
     {
@@ -49,7 +241,7 @@ internal sealed class WslcBackendService : IDisposable
     public Task<IReadOnlyList<ImageSummary>> ListImagesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var session = EnsureSession();
+        var session = GetActiveSessionInstance();
 
         var images = session
             .GetImages()
@@ -156,6 +348,8 @@ internal sealed class WslcBackendService : IDisposable
         string cpuUsageText;
         string memoryUsageText;
         string sessionStatus;
+        double cpuPercent = 0;
+        double memoryPercent = 0;
 
         if (runningCount == 0)
         {
@@ -172,6 +366,9 @@ internal sealed class WslcBackendService : IDisposable
                 IReadOnlyList<ContainerStatsItem> stats = await GetContainerStatsAsync(cancellationToken);
                 cpuUsageText = FormatCpuUsage(stats);
                 memoryUsageText = FormatMemoryUsage(stats);
+                cpuPercent = ComputeCpuPercent(stats);
+                memoryPercent = ComputeMemoryPercent(stats);
+                System.Diagnostics.Debug.WriteLine($"[WslcBackendService] Computed cpuPercent={cpuPercent}, memoryPercent={memoryPercent}, statsCount={stats.Count}");
                 sessionStatus = $"WSL Containers is connected. {runningCount} container{(runningCount == 1 ? string.Empty : "s")} running.";
             }
             catch
@@ -185,13 +382,17 @@ internal sealed class WslcBackendService : IDisposable
         return new DashboardSnapshot(
             cpuUsageText,
             memoryUsageText,
-            $"{runningCount} running / {stoppedCount} stopped",
-            sessionStatus);
+            $"{runningCount} running",
+            sessionStatus)
+        {
+            CpuPercent = cpuPercent,
+            MemoryPercent = memoryPercent,
+        };
     }
 
     public async Task PullImageAsync(string imageReference, IProgress<ImagePullProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var session = EnsureSession();
+        var session = GetActiveSessionInstance();
         var operation = session.PullImageAsync(new PullImageOptions(imageReference));
         var progressAdapter = new Progress<Microsoft.WSL.Containers.ImageProgress>(update =>
         {
@@ -205,7 +406,7 @@ internal sealed class WslcBackendService : IDisposable
     public Task DeleteImageAsync(string imageReference, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureSession().DeleteImage(imageReference);
+        GetActiveSessionInstance().DeleteImage(imageReference);
         return Task.CompletedTask;
     }
 
@@ -214,7 +415,7 @@ internal sealed class WslcBackendService : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         SplitReference(newTag, out string repository, out string tag);
-        EnsureSession().TagImage(new TagImageOptions(sourceImageReference, repository, tag));
+        GetActiveSessionInstance().TagImage(new TagImageOptions(sourceImageReference, repository, tag));
 
         return Task.CompletedTask;
     }
@@ -229,18 +430,29 @@ internal sealed class WslcBackendService : IDisposable
     {
         lock (_syncLock)
         {
-            _session?.Terminate();
-            _session?.Dispose();
-            _session = null;
+            foreach (var session in _sessions.Values)
+            {
+                try { session.Terminate(); } catch { }
+                session.Dispose();
+            }
+
+            _sessions.Clear();
         }
     }
 
-    private Session EnsureSession()
+    private Session GetActiveSessionInstance()
     {
         lock (_syncLock)
         {
-            _session ??= StartSession("Porthole");
-            return _session;
+            if (!_sessions.TryGetValue(_activeSessionName, out Session? session))
+            {
+                var settings = CreateDefaultSessionSettings(_activeSessionName);
+                session = StartSession(_activeSessionName);
+                _sessions[_activeSessionName] = session;
+                _sessionSettings[_activeSessionName] = settings.StoragePath;
+            }
+
+            return session;
         }
     }
 
@@ -298,6 +510,23 @@ internal sealed class WslcBackendService : IDisposable
 
         double totalPercent = stats.Sum(stat => ParsePercentage(stat.CPUPerc));
         return $"{totalPercent:0.##}%";
+    }
+
+    private static double ComputeCpuPercent(IReadOnlyList<ContainerStatsItem> stats) =>
+        stats.Sum(stat => ParsePercentage(stat.CPUPerc));
+
+    private static double ComputeMemoryPercent(IReadOnlyList<ContainerStatsItem> stats)
+    {
+        ulong usedBytes = 0;
+        ulong totalBytes = 0;
+        foreach (ContainerStatsItem stat in stats)
+        {
+            ParseMemoryUsage(stat.MemUsage, out ulong used, out ulong total);
+            usedBytes += used;
+            totalBytes = Math.Max(totalBytes, total);
+        }
+
+        return totalBytes == 0 ? 0 : Math.Clamp((double)usedBytes / totalBytes * 100.0, 0, 100);
     }
 
     private static string FormatMemoryUsage(IReadOnlyList<ContainerStatsItem> stats)

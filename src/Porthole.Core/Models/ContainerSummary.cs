@@ -16,4 +16,6 @@ public sealed record ContainerSummary(
     public string MetadataLine => string.IsNullOrWhiteSpace(Image)
         ? StateText
         : $"{StateText} - {Image}";
+
+    public string StateGlyph => IsRunning ? "\uE768" : "\uE71A";
 }

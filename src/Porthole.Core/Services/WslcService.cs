@@ -68,13 +68,13 @@ public sealed class WslcService : IWslcService
 
             string cpu = "Idle";
             string memory = "Idle";
+            double totalCpu = 0;
 
             if (running > 0)
             {
                 string statsJson = await RunWslcCommandAsync("stats --format json", cancellationToken);
                 using JsonDocument statsDocument = JsonDocument.Parse(statsJson);
 
-                double totalCpu = 0;
                 foreach (JsonElement stat in statsDocument.RootElement.EnumerateArray())
                 {
                     if (stat.TryGetProperty("CPUPerc", out JsonElement cpuElement))
@@ -103,15 +103,18 @@ public sealed class WslcService : IWslcService
             return new DashboardSnapshot(
                 cpu,
                 memory,
-                $"{running} running / {stopped} stopped",
-                "Running in local telemetry mode because tray snapshot API is unavailable.");
+                $"{running} running",
+                "Running in local telemetry mode because tray snapshot API is unavailable.")
+            {
+                CpuPercent = totalCpu,
+            };
         }
         catch
         {
             return new DashboardSnapshot(
                 "Unavailable",
                 "Unavailable",
-                "0 running / 0 stopped",
+                "0 running",
                 "Tray host unavailable and local telemetry fallback failed.");
         }
     }

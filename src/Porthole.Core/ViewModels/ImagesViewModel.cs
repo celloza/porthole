@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Porthole.Core.Models;
 using Porthole.Core.Services;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Porthole.Core.ViewModels;
 
@@ -31,6 +32,9 @@ public partial class ImagesViewModel : ObservableObject
     [ObservableProperty]
     private string newTag = "local/dev:latest";
 
+    [ObservableProperty]
+    private bool isInitialLoadInProgress;
+
     public ImagesViewModel(IImageCatalogService imageCatalogService)
     {
         _imageCatalogService = imageCatalogService;
@@ -38,7 +42,11 @@ public partial class ImagesViewModel : ObservableObject
 
     public double PullProgressOpacity => PullProgressPercent > 0 && PullProgressPercent < 100 ? 1 : 0;
 
-    public string ImageCountLabel => Images.Count == 1 ? "1 image" : $"{Images.Count} images";
+    public string ImageCountLabel => IsInitialLoadInProgress
+        ? "Loading..."
+        : Images.Count == 1 ? "1 image" : $"{Images.Count} images";
+
+    public double InitialLoadIndicatorOpacity => IsInitialLoadInProgress ? 1 : 0;
 
     public string SelectedImageTitle => SelectedImage?.DisplayName ?? "No image selected";
 
@@ -48,7 +56,20 @@ public partial class ImagesViewModel : ObservableObject
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        await RefreshAsync(cancellationToken);
+        IsInitialLoadInProgress = true;
+        OnPropertyChanged(nameof(ImageCountLabel));
+        OnPropertyChanged(nameof(InitialLoadIndicatorOpacity));
+
+        try
+        {
+            await RefreshAsync(cancellationToken);
+        }
+        finally
+        {
+            IsInitialLoadInProgress = false;
+            OnPropertyChanged(nameof(ImageCountLabel));
+            OnPropertyChanged(nameof(InitialLoadIndicatorOpacity));
+        }
     }
 
     public Task SubscribeAsync(Func<IReadOnlyList<ImageSummary>, Task> onUpdate, CancellationToken cancellationToken = default)
@@ -88,7 +109,6 @@ public partial class ImagesViewModel : ObservableObject
         OnPropertyChanged(nameof(ImageCountLabel));
         OnPropertyChanged(nameof(SelectedImageTitle));
         OnPropertyChanged(nameof(SelectedImageSubtitle));
-        ActionStatus = $"Loaded {Images.Count} cached image records.";
     }
 
     [RelayCommand]
@@ -185,10 +205,26 @@ public partial class ImagesViewModel : ObservableObject
         ActionStatus = $"Deleted {imageName}.";
     }
 
+    [RelayCommand]
+    private void CopySha()
+    {
+        if (SelectedImage is null) return;
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(SelectedImage.Id);
+        Clipboard.SetContent(dataPackage);
+        ActionStatus = "SHA copied to clipboard.";
+    }
+
     partial void OnSelectedImageChanged(ImageSummary? value)
     {
         OnPropertyChanged(nameof(SelectedImageTitle));
         OnPropertyChanged(nameof(SelectedImageSubtitle));
+    }
+
+    partial void OnIsInitialLoadInProgressChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ImageCountLabel));
+        OnPropertyChanged(nameof(InitialLoadIndicatorOpacity));
     }
 
     private static string FormatPullErrorMessage(string? rawMessage, string imageReference)

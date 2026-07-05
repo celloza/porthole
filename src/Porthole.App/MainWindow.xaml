@@ -36,7 +36,7 @@
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="True"
             PaneDisplayMode="Left"
-            Header="{x:Bind ViewModel.CurrentSectionTitle, Mode=OneWay}"
+            AlwaysShowHeader="False"
             SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItem
@@ -57,13 +57,34 @@
                         <FontIcon Glyph="&#xE8A5;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Sessions" Tag="sessions">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7EF;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Networking" Tag="networking">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xF785;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Run Wizard" Tag="run-wizard">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE70F;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-            <Frame x:Name="NavFrame" />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    Margin="24,20,24,0"
+                    FontSize="28"
+                    FontWeight="SemiBold"
+                    Text="{x:Bind ViewModel.CurrentSectionTitle, Mode=OneWay}" />
+                <Frame Grid.Row="1" x:Name="NavFrame" />
+            </Grid>
         </NavigationView>
     </Grid>
 </Window>

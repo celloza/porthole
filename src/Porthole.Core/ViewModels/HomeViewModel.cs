@@ -6,8 +6,17 @@ namespace Porthole.Core.ViewModels;
 
 public partial class HomeViewModel : ObservableObject
 {
+    public const int GraphHistoryCapacity = 60;
+
     private readonly IWslcService _wslcService;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private readonly Queue<double> _cpuHistory = new();
+    private readonly Queue<double> _memHistory = new();
+
+    public event EventHandler? HistoryUpdated;
+
+    public IReadOnlyList<double> CpuHistory { get; private set; } = [];
+    public IReadOnlyList<double> MemoryHistory { get; private set; } = [];
 
     [ObservableProperty]
     private bool isLoading = true;
@@ -28,7 +37,7 @@ public partial class HomeViewModel : ObservableObject
     private string memoryUsageText = "Pending";
 
     [ObservableProperty]
-    private string containerSummaryText = "0 running / 0 stopped";
+    private string containerSummaryText = "0 running";
 
     public HomeViewModel(IWslcService wslcService)
     {
@@ -62,6 +71,9 @@ public partial class HomeViewModel : ObservableObject
 
     public void ApplySnapshot(DashboardSnapshot snapshot)
     {
+        // DEBUG: Log received snapshot values
+        System.Diagnostics.Debug.WriteLine($"[HomeViewModel.ApplySnapshot] CpuPercent={snapshot.CpuPercent}, MemoryPercent={snapshot.MemoryPercent}");
+
         var report = _wslcService.GetMissingComponents();
         IsPrereleaseUpdateRequired = !report.IsReady;
         MissingComponentsMessage = report.Summary;
@@ -72,5 +84,18 @@ public partial class HomeViewModel : ObservableObject
         SessionStatus = report.IsReady
             ? snapshot.SessionStatus
             : "WSL Containers is not ready yet. Resolve prerequisites before opening Images or Containers.";
+
+        PushToHistory(snapshot.CpuPercent, snapshot.MemoryPercent);
+    }
+
+    private void PushToHistory(double cpuPercent, double memPercent)
+    {
+        if (_cpuHistory.Count >= GraphHistoryCapacity) _cpuHistory.Dequeue();
+        _cpuHistory.Enqueue(Math.Clamp(cpuPercent, 0, 100));
+        if (_memHistory.Count >= GraphHistoryCapacity) _memHistory.Dequeue();
+        _memHistory.Enqueue(Math.Clamp(memPercent, 0, 100));
+        CpuHistory = _cpuHistory.ToArray();
+        MemoryHistory = _memHistory.ToArray();
+        HistoryUpdated?.Invoke(this, EventArgs.Empty);
     }
 }

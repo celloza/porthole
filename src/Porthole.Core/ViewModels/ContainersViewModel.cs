@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Porthole.Core.Models;
 using Porthole.Core.Services;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Porthole.Core.ViewModels;
 
@@ -175,6 +176,16 @@ public partial class ContainersViewModel : ObservableObject
         await _containerCatalogService.RemoveContainerAsync(SelectedContainer, cancellationToken);
         ActionStatus = $"Removed {displayName}.";
         await RefreshAsync(cancellationToken);
+    }
+
+    [RelayCommand]
+    private void CopyId()
+    {
+        if (SelectedContainer is null) return;
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(SelectedContainer.Id);
+        Clipboard.SetContent(dataPackage);
+        ActionStatus = "Container ID copied to clipboard.";
     }
 
     partial void OnSelectedContainerChanged(ContainerSummary? value)

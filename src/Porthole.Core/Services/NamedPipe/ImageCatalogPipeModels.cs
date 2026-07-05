@@ -18,6 +18,17 @@ public enum ImageCatalogOperation
     ListPods = 16,
     SubscribeContainers = 17,
     SubscribeImages = 18,
+
+    // Session management
+    ListSessions = 20,
+    CreateSession = 21,
+    DeleteSession = 22,
+    SetActiveSession = 23,
+    GetActiveSession = 24,
+
+    // Networking
+    GetNetworkingSnapshot = 30,
+    SetNetworkMode = 31,
 }
 
 public enum ImageCatalogMessageKind
@@ -32,7 +43,9 @@ public sealed record ImageCatalogRequest(
     ImageCatalogOperation Operation,
     string? ImageReference = null,
     string? NewTag = null,
-    string? ContainerReference = null);
+    string? ContainerReference = null,
+    string? SessionName = null,
+    NetworkMode? NetworkMode = null);
 
 public sealed record ImageCatalogResponse(
     ImageCatalogMessageKind Kind,
@@ -41,4 +54,6 @@ public sealed record ImageCatalogResponse(
     IReadOnlyList<ContainerSummary>? Containers = null,
     IReadOnlyList<PodSummary>? Pods = null,
     IReadOnlyList<ImageSummary>? Images = null,
-    ImagePullProgress? Progress = null);
+    ImagePullProgress? Progress = null,
+    IReadOnlyList<SessionSummary>? Sessions = null,
+    NetworkingSnapshot? NetworkingSnapshot = null);

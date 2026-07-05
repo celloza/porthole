@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml;
+using Porthole.Core.Models;
 using Porthole.Core.ViewModels;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Porthole_App.Pages;
 
@@ -100,4 +102,20 @@ public sealed partial class ContainersPage : Page
 
         return completion.Task;
     }
+
+    private void ItemCopyIdButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement el && el.Tag is string id)
+        {
+            var dataPackage = new DataPackage();
+            dataPackage.SetText(id);
+            Clipboard.SetContent(dataPackage);
+        }
+    }
+
+    private Visibility GetDetailVisibility(ContainerSummary? container) =>
+        container is not null ? Visibility.Visible : Visibility.Collapsed;
+
+    private Visibility GetEmptyStateVisibility(ContainerSummary? container) =>
+        container is null ? Visibility.Visible : Visibility.Collapsed;
 }

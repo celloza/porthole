@@ -41,11 +41,15 @@ public partial class App : Application
         services.AddSingleton<IWslcService, WslcService>();
         services.AddSingleton<IImageCatalogService, NamedPipeImageCatalogService>();
         services.AddSingleton<IContainerCatalogService, NamedPipeContainerCatalogService>();
+        services.AddSingleton<ISessionService, NamedPipeSessionService>();
+        services.AddSingleton<INetworkingService, NamedPipeNetworkingService>();
         services.AddSingleton<NamedPipeDashboardSnapshotService>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ImagesViewModel>();
         services.AddTransient<ContainersViewModel>();
+        services.AddTransient<SessionViewModel>();
+        services.AddTransient<NetworkingViewModel>();
 
         return services.BuildServiceProvider();
     }

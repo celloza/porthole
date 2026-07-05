@@ -235,6 +235,51 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Prune complete."));
                         Log("Image prune response sent.");
                         break;
+                    case ImageCatalogOperation.ListSessions:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                Sessions: backendService.ListSessions()));
+                        Log("Session list response sent.");
+                        break;
+                    case ImageCatalogOperation.CreateSession:
+                        backendService.CreateNamedSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Session created."));
+                        Log("Create session response sent.");
+                        break;
+                    case ImageCatalogOperation.DeleteSession:
+                        backendService.DeleteNamedSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Session deleted."));
+                        Log("Delete session response sent.");
+                        break;
+                    case ImageCatalogOperation.SetActiveSession:
+                        backendService.SetActiveSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Active session updated."));
+                        Log("Set active session response sent.");
+                        break;
+                    case ImageCatalogOperation.GetActiveSession:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                Message: backendService.GetActiveSessionName()));
+                        Log("Get active session response sent.");
+                        break;
+                    case ImageCatalogOperation.GetNetworkingSnapshot:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                NetworkingSnapshot: await backendService.GetNetworkingSnapshotAsync(cancellationToken)));
+                        Log("Networking snapshot response sent.");
+                        break;
+                    case ImageCatalogOperation.SetNetworkMode:
+                        backendService.SetNetworkMode(
+                            request.NetworkMode ?? throw new IOException("Network mode is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Network mode updated."));
+                        Log("Set network mode response sent.");
+                        break;
                     default:
                         throw new InvalidOperationException($"Unsupported image operation: {request.Operation}");
                 }
