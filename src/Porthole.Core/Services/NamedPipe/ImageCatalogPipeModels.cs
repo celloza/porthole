@@ -26,6 +26,9 @@ public enum ImageCatalogOperation
     SetActiveSession = 23,
     GetActiveSession = 24,
 
+    // Container creation
+    CreateContainer = 25,
+
     // Networking
     GetNetworkingSnapshot = 30,
     SetNetworkMode = 31,
@@ -45,7 +48,8 @@ public sealed record ImageCatalogRequest(
     string? NewTag = null,
     string? ContainerReference = null,
     string? SessionName = null,
-    NetworkMode? NetworkMode = null);
+    NetworkMode? NetworkMode = null,
+    ContainerConfig? ContainerConfig = null);
 
 public sealed record ImageCatalogResponse(
     ImageCatalogMessageKind Kind,

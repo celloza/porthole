@@ -426,6 +426,77 @@ internal sealed class WslcBackendService : IDisposable
         throw new NotSupportedException("The current Microsoft.WSL.Containers SDK does not expose an image prune API.");
     }
 
+    public async Task<string> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(config.Name))
+        {
+            throw new InvalidOperationException("Container name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(config.ImageReference))
+        {
+            throw new InvalidOperationException("Image reference is required.");
+        }
+
+        var args = new System.Text.StringBuilder("run --detach");
+
+        args.Append(" --name ");
+        args.Append(EscapeCliArgument(config.Name.Trim()));
+
+        if (config.PortMappings is not null)
+        {
+            foreach (string port in config.PortMappings)
+            {
+                if (!string.IsNullOrWhiteSpace(port))
+                {
+                    args.Append(" --publish ");
+                    args.Append(EscapeCliArgument(port.Trim()));
+                }
+            }
+        }
+
+        if (config.EnvironmentVariables is not null)
+        {
+            foreach (string env in config.EnvironmentVariables)
+            {
+                if (!string.IsNullOrWhiteSpace(env))
+                {
+                    args.Append(" --env ");
+                    args.Append(EscapeCliArgument(env.Trim()));
+                }
+            }
+        }
+
+        if (config.VolumeMounts is not null)
+        {
+            foreach (string vol in config.VolumeMounts)
+            {
+                if (!string.IsNullOrWhiteSpace(vol))
+                {
+                    args.Append(" --volume ");
+                    args.Append(EscapeCliArgument(vol.Trim()));
+                }
+            }
+        }
+
+        args.Append(' ');
+        args.Append(EscapeCliArgument(config.ImageReference.Trim()));
+
+        if (!string.IsNullOrWhiteSpace(config.StartupCommand))
+        {
+            foreach (string startupArg in SplitCommandLineArguments(config.StartupCommand.Trim()))
+            {
+                args.Append(' ');
+                args.Append(EscapeCliArgument(startupArg));
+            }
+        }
+
+        string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);
+        return output.Trim();
+    }
+
     public void Dispose()
     {
         lock (_syncLock)
@@ -708,8 +779,95 @@ internal sealed class WslcBackendService : IDisposable
 
     private static string EscapeCliArgument(string value)
     {
-        string escaped = value.Replace("\"", "\\\"");
-        return $"\"{escaped}\"";
+        var escaped = new System.Text.StringBuilder(value.Length + 2);
+        escaped.Append('"');
+
+        int backslashCount = 0;
+        foreach (char ch in value)
+        {
+            if (ch == '\\')
+            {
+                backslashCount++;
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                escaped.Append('\\', backslashCount * 2 + 1);
+                escaped.Append('"');
+                backslashCount = 0;
+                continue;
+            }
+
+            if (backslashCount > 0)
+            {
+                escaped.Append('\\', backslashCount);
+                backslashCount = 0;
+            }
+
+            escaped.Append(ch);
+        }
+
+        if (backslashCount > 0)
+        {
+            // Trailing backslashes must be doubled before the closing quote.
+            escaped.Append('\\', backslashCount * 2);
+        }
+
+        escaped.Append('"');
+        return escaped.ToString();
+    }
+
+    private static IReadOnlyList<string> SplitCommandLineArguments(string commandLine)
+    {
+        var args = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool inQuotes = false;
+        char quoteChar = '\0';
+
+        foreach (char ch in commandLine)
+        {
+            if ((ch == '"' || ch == '\'') && (!inQuotes || quoteChar == ch))
+            {
+                if (!inQuotes)
+                {
+                    inQuotes = true;
+                    quoteChar = ch;
+                }
+                else
+                {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                }
+
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    args.Add(current.ToString());
+                    current.Clear();
+                }
+
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        if (inQuotes)
+        {
+            throw new InvalidOperationException("Startup command contains an unmatched quote.");
+        }
+
+        if (current.Length > 0)
+        {
+            args.Add(current.ToString());
+        }
+
+        return args;
     }
 
     private sealed record ContainerListItem(string Id, string Name, string Image, int State);

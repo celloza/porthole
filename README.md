@@ -22,9 +22,9 @@ It uses a WinUI 3 application for the UI and a tray-hosted backend for container
 - ✅ **Containers**: start, stop, and remove containers
 - ✅ **Sessions**: create and manage isolated session environments for workload grouping
 - ✅ **Networking**: configure network mode (bridge vs. consomme) and inspect active port bindings and host proxy configuration
+- ✅ **Run Wizard**: interactive container creation with template save/load, port mapping, environment variables, and volume configuration
 
 **Planned:**
-- 🔄 **Run Wizard**: interactive container creation with port mapping, environment variables, and volume configuration
 - 📋 **Volume Management**: track named volumes and virtiofs mounts with create/delete/prune operations
 - 🔒 **Enterprise Governance**: MDM registry allowlists, Defender for Endpoint integration, audit logging
 
@@ -114,6 +114,50 @@ Isolated container environments for multi-tenant and workload grouping scenarios
 - View all available sessions with metadata (name, storage path, active status)
 - Visual indicator for the currently active session
 - Storage path shows where session state and containers are persisted
+
+### Run Wizard
+
+Interactive guided flow for creating a container configuration and starting it:
+
+**Wizard Start**
+- Choose **Use Template File** to load a saved JSON template
+- Choose **Create New** to start from an empty configuration
+
+**Configuration Steps**
+- Step 1: Basic settings (container name, image, optional startup command)
+- Step 2: Advanced settings (port mappings, environment variables, volume mounts)
+- Step 3: Review and run
+
+**Run Actions**
+- Primary action: **Save Template and Run**
+- Secondary action: **Run Without Saving** from split-button menu
+
+**Template Format & Versioning**
+- Newly saved templates use a versioned envelope format:
+
+```json
+{
+  "version": 2,
+  "container": {
+    "name": "web",
+    "imageReference": "nginx:latest",
+    "startupCommand": null,
+    "portMappings": ["8080:80"],
+    "environmentVariables": ["ENV=prod"],
+    "volumeMounts": ["C:\\data:/app/data"]
+  },
+  "savedAtUtc": "2026-07-05T11:42:52.0000000+00:00"
+}
+```
+
+- The loader supports:
+  - Legacy unversioned templates (raw container fields at root)
+  - Versioned templates (v1 and v2)
+  - Compatibility aliases for config payload location (`container` or `config`)
+
+**Default Template File Naming**
+- Save picker suggests: `porthole-<imagename>-ddmmyyhhss.json`
+- Example: `porthole-nginx-0507261142.json`
 
 ## Projects
 

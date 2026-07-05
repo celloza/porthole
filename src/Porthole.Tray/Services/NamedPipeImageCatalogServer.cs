@@ -18,6 +18,7 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
 
     private static readonly TimeSpan DashboardTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan ListTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CreateContainerTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan WriteTimeout = TimeSpan.FromSeconds(5);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -205,6 +206,17 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                             cancellationToken);
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Container remove complete."));
                         Log("Container remove response sent.");
+                        break;
+                    case ImageCatalogOperation.CreateContainer:
+                        string containerId = await ExecuteWithTimeoutAsync(
+                            token => backendService.CreateContainerAsync(
+                                request.ContainerConfig ?? throw new IOException("Container configuration is required."),
+                                token),
+                            CreateContainerTimeout,
+                            cancellationToken,
+                            "Create container request timed out.");
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: containerId));
+                        Log("Create container response sent.");
                         break;
                     case ImageCatalogOperation.Pull:
                         await backendService.PullImageAsync(
