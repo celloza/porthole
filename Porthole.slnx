@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Porthole.App/Porthole.App.csproj" />
     <Project Path="src/Porthole.Core/Porthole.Core.csproj" />
+    <Project Path="src/Porthole.Installer/Porthole.Installer.wixproj" />
     <Project Path="src/Porthole.Tray/Porthole.Tray.csproj" />
   </Folder>
   <Folder Name="/tests/">

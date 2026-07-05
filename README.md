@@ -240,11 +240,33 @@ dotnet run --project src/Porthole.Tray -c Debug
 dotnet test tests/Porthole.Core.Tests/Porthole.Core.Tests.csproj -c Debug
 ```
 
+## Build Installer (WiX MSI)
+
+Porthole includes a WiX v4 installer project intended for winget-friendly distribution.
+
+```powershell
+dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=1.0.0 -p:Platform=x64
+```
+
+What this does:
+- Publishes self-contained `Porthole.App` and `Porthole.Tray` payloads for the selected architecture
+- Stages payload files under `src/Porthole.Installer/obj/<Configuration>/payload`
+- Produces an MSI named `Porthole-<version>-<arch>.msi` under `src/Porthole.Installer/bin/<Configuration>`
+
+Winget notes:
+- Use the MSI URL from GitHub Releases in your winget manifest (`InstallerType: msi`)
+- Keep `PackageVersion` aligned with `-p:ProductVersion` used for the MSI build
+- The MSI supports standard silent install switches used by winget (`/quiet` and `/qn`)
+
 ## CI
 
 A GitHub Actions workflow runs tests on pull requests:
 
 - `.github/workflows/tests.yml`
+
+Release automation documentation:
+
+- `docs/release-workflow.md`
 
 ## Development Notes
 

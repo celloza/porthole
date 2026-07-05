@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Porthole"
+    Manufacturer="celloza"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{BBF4A472-0764-4B18-B269-3AA1854A0B3F}"
+    Scope="perMachine"
+    InstallerVersion="500"
+    Compressed="yes">
+
+    <SummaryInformation Description="Porthole for Windows" Manufacturer="celloza" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Porthole is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Porthole">
+        <Directory Id="INSTALLDIR_APP" Name="App" />
+        <Directory Id="INSTALLDIR_TRAY" Name="Tray" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuDir" Name="Porthole" />
+    </StandardDirectory>
+
+    <Component Id="ProgramMenuShortcutComponent" Directory="ProgramMenuDir" Guid="{3F8224DB-2645-44BC-BD9A-930D523694A9}">
+      <Shortcut
+        Id="PortholeShortcut"
+        Name="Porthole"
+        Description="Launch Porthole tray and dashboard"
+        Target="[INSTALLDIR_TRAY]Porthole.Tray.exe"
+        WorkingDirectory="INSTALLDIR_TRAY" />
+      <RemoveFolder Id="RemoveProgramMenuDir" Directory="ProgramMenuDir" On="uninstall" />
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\celloza\Porthole"
+        Name="Installed"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+    </Component>
+
+    <Feature Id="MainFeature" Title="Porthole" Level="1" AllowAdvertise="no">
+      <ComponentGroupRef Id="AppPayloadComponents" />
+      <ComponentGroupRef Id="TrayPayloadComponents" />
+      <ComponentRef Id="ProgramMenuShortcutComponent" />
+    </Feature>
+
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/celloza/porthole" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/celloza/porthole/issues" />
+  </Package>
+</Wix>
