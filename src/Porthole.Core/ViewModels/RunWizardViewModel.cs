@@ -12,6 +12,7 @@ public partial class RunWizardViewModel : ObservableObject
     private static readonly Regex ContainerNameRegex = new(@"^[a-zA-Z0-9][a-zA-Z0-9_\-]*$", RegexOptions.Compiled);
     private static readonly Regex PortMappingRegex = new(@"^\d+:\d+(/(tcp|udp))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EnvVarRegex = new(@"^[^=]+=.*$", RegexOptions.Compiled);
+    private static readonly Regex VolumeMountRegex = new(@"^[^:]+:[^:]+(:[^:]+)?$", RegexOptions.Compiled);
 
     private readonly IImageCatalogService _imageCatalogService;
     private readonly IContainerCatalogService _containerCatalogService;
@@ -290,6 +291,12 @@ public partial class RunWizardViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(volume))
         {
             VolumeMountValidation = "Enter a volume mount before adding it.";
+            return;
+        }
+
+        if (!VolumeMountRegex.IsMatch(volume))
+        {
+            VolumeMountValidation = "Invalid format. Use source:target or source:target:options (e.g., myvolume:/app/data or /host/path:/container/path:ro).";
             return;
         }
 

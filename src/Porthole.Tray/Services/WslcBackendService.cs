@@ -487,7 +487,7 @@ internal sealed class WslcBackendService : IDisposable
         if (!string.IsNullOrWhiteSpace(config.StartupCommand))
         {
             args.Append(' ');
-            args.Append(config.StartupCommand.Trim());
+            args.Append(EscapeCliArgument(config.StartupCommand.Trim()));
         }
 
         string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);

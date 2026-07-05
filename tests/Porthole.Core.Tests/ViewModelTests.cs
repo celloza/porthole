@@ -358,6 +358,20 @@ public class ViewModelTests
     }
 
     [Fact]
+    public void RunWizardViewModel_AddVolumeMount_InvalidFormat_ShowsError()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewVolumeMount = "no-colon-separator";
+        viewModel.AddVolumeMountCommand.Execute(null);
+
+        Assert.Empty(viewModel.VolumeMounts);
+        Assert.NotEmpty(viewModel.VolumeMountValidation);
+    }
+
+    [Fact]
     public async Task RunWizardViewModel_CreateContainer_Success_UpdatesStatus()
     {
         var images = new List<ImageSummary>
