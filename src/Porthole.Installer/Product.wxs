@@ -10,7 +10,7 @@
     Compressed="yes">
 
     <SummaryInformation Description="Porthole for Windows" Manufacturer="celloza" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Porthole is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Porthole is already installed." AllowSameVersionUpgrades="yes" />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="PortholeAppIcon" SourceFile="..\Porthole.App\Assets\AppIcon.ico" />
     <ui:WixUI Id="WixUI_Mondo" />
