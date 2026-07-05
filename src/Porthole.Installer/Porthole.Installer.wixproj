@@ -11,7 +11,7 @@
     </DefineConstants>
     <OutputName>Porthole-$(ProductVersion)-$(InstallerPlatform)</OutputName>
     <GeneratedPayloadWxs>$(MSBuildProjectDirectory)\obj\$(Configuration)\GeneratedPayload.wxs</GeneratedPayloadWxs>
-    <SuppressIces>ICE38;ICE64;ICE91</SuppressIces>
+    <SuppressIces>ICE38;ICE61;ICE64;ICE91</SuppressIces>
   </PropertyGroup>
 
   <ItemGroup>
