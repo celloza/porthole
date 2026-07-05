@@ -238,7 +238,7 @@ public sealed partial class RunWizardPage : Page
         }
 
         string safeImageName = SanitizeFileNamePart(imageName);
-        string timestamp = DateTime.Now.ToString("ddMMyyHHss", CultureInfo.InvariantCulture);
+        string timestamp = DateTimeOffset.UtcNow.ToString("ddMMyyHHmmss", CultureInfo.InvariantCulture);
         return $"porthole-{safeImageName}-{timestamp}.json";
     }
 
