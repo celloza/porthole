@@ -4,11 +4,407 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:models="using:Porthole.Core.Models"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <StackPanel Padding="24,20,24,32" Spacing="16">
-        <TextBlock Opacity="0.72" Text="Run Wizard is under active development. You will be able to configure image, ports, mounts, and runtime options from a guided flow." TextWrapping="WrapWholeWords" />
-        <TextBlock Opacity="0.72" Text="For now, start containers from the Containers page or with wslc commands in a terminal." TextWrapping="WrapWholeWords" />
-    </StackPanel>
+    <Grid Padding="24,16,24,24" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  Step indicator  -->
+        <Border
+            Padding="14,10"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Text="{x:Bind ViewModel.StepTitle, Mode=OneWay}"
+                    VerticalAlignment="Center" />
+                <ProgressRing
+                    Grid.Column="1"
+                    Width="18"
+                    Height="18"
+                    IsActive="{x:Bind ViewModel.IsCreating, Mode=OneWay}"
+                    Visibility="{x:Bind GetVisibleWhenCreating(ViewModel.IsCreating), Mode=OneWay}" />
+            </Grid>
+        </Border>
+
+        <!--  Step content  -->
+        <Border
+            Grid.Row="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+            <ScrollViewer Padding="20">
+                <StackPanel Spacing="20">
+
+                    <!--  Step 1: Basic Settings  -->
+                    <StackPanel
+                        Spacing="16"
+                        Visibility="{x:Bind GetStepVisibility(ViewModel.IsStepOneActive), Mode=OneWay}">
+
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="CONTAINER NAME" />
+                            <TextBox
+                                PlaceholderText="my-container"
+                                Text="{x:Bind ViewModel.ContainerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                Text="{x:Bind ViewModel.ContainerNameValidation, Mode=OneWay}"
+                                Visibility="{x:Bind GetVisibleWhenNonEmpty(ViewModel.ContainerNameValidation), Mode=OneWay}" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="IMAGE" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ProgressRing
+                                    Width="14"
+                                    Height="14"
+                                    IsActive="{x:Bind ViewModel.IsLoadingImages, Mode=OneWay}"
+                                    Visibility="{x:Bind GetVisibleWhenLoading(ViewModel.IsLoadingImages), Mode=OneWay}" />
+                                <TextBlock
+                                    FontSize="11"
+                                    Opacity="0.6"
+                                    Text="Loading images..."
+                                    VerticalAlignment="Center"
+                                    Visibility="{x:Bind GetVisibleWhenLoading(ViewModel.IsLoadingImages), Mode=OneWay}" />
+                            </StackPanel>
+                            <ComboBox
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{x:Bind ViewModel.AvailableImages, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.SelectedImage, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ImageSummary">
+                                        <TextBlock Text="{x:Bind DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock
+                                FontSize="11"
+                                Opacity="0.55"
+                                Text="Pull images on the Images page if none are listed." />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="STARTUP COMMAND (OPTIONAL)" />
+                            <TextBox
+                                PlaceholderText="Leave blank to use the image default entrypoint"
+                                Text="{x:Bind ViewModel.StartupCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--  Step 2: Advanced Settings  -->
+                    <StackPanel
+                        Spacing="20"
+                        Visibility="{x:Bind GetStepVisibility(ViewModel.IsStepTwoActive), Mode=OneWay}">
+
+                        <!--  Port Mappings  -->
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="PORT MAPPINGS" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    Grid.Column="0"
+                                    PlaceholderText="8080:80 or 8080:80/tcp"
+                                    Text="{x:Bind ViewModel.NewPortMapping, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button
+                                    Grid.Column="1"
+                                    Command="{x:Bind ViewModel.AddPortMappingCommand}">
+                                    <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                </Button>
+                            </Grid>
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                Text="{x:Bind ViewModel.PortMappingValidation, Mode=OneWay}"
+                                Visibility="{x:Bind GetVisibleWhenNonEmpty(ViewModel.PortMappingValidation), Mode=OneWay}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.PortMappings, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid Margin="0,2" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                Text="{x:Bind}"
+                                                VerticalAlignment="Center" />
+                                            <Button
+                                                Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                MinWidth="0"
+                                                Padding="0"
+                                                Click="RemovePortMappingButton_Click"
+                                                Tag="{x:Bind}">
+                                                <FontIcon FontSize="10" Glyph="&#xE711;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!--  Environment Variables  -->
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="ENVIRONMENT VARIABLES" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    Grid.Column="0"
+                                    PlaceholderText="MY_VAR=value"
+                                    Text="{x:Bind ViewModel.NewEnvironmentVariable, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button
+                                    Grid.Column="1"
+                                    Command="{x:Bind ViewModel.AddEnvironmentVariableCommand}">
+                                    <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                </Button>
+                            </Grid>
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                Text="{x:Bind ViewModel.EnvVarValidation, Mode=OneWay}"
+                                Visibility="{x:Bind GetVisibleWhenNonEmpty(ViewModel.EnvVarValidation), Mode=OneWay}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.EnvironmentVariables, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid Margin="0,2" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                Text="{x:Bind}"
+                                                VerticalAlignment="Center" />
+                                            <Button
+                                                Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                MinWidth="0"
+                                                Padding="0"
+                                                Click="RemoveEnvVarButton_Click"
+                                                Tag="{x:Bind}">
+                                                <FontIcon FontSize="10" Glyph="&#xE711;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!--  Volume Mounts  -->
+                        <StackPanel Spacing="8">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="VOLUME MOUNTS" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    Grid.Column="0"
+                                    PlaceholderText="myvolume:/app/data or C:\data:/app/data"
+                                    Text="{x:Bind ViewModel.NewVolumeMount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button
+                                    Grid.Column="1"
+                                    Command="{x:Bind ViewModel.AddVolumeMountCommand}">
+                                    <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                </Button>
+                            </Grid>
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                Text="{x:Bind ViewModel.VolumeMountValidation, Mode=OneWay}"
+                                Visibility="{x:Bind GetVisibleWhenNonEmpty(ViewModel.VolumeMountValidation), Mode=OneWay}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.VolumeMounts, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid Margin="0,2" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                Text="{x:Bind}"
+                                                VerticalAlignment="Center" />
+                                            <Button
+                                                Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                MinWidth="0"
+                                                Padding="0"
+                                                Click="RemoveVolumeMountButton_Click"
+                                                Tag="{x:Bind}">
+                                                <FontIcon FontSize="10" Glyph="&#xE711;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!--  Step 3: Review & Create  -->
+                    <StackPanel
+                        Spacing="16"
+                        Visibility="{x:Bind GetStepVisibility(ViewModel.IsStepThreeActive), Mode=OneWay}">
+
+                        <TextBlock
+                            FontSize="13"
+                            Opacity="0.72"
+                            Text="Review your container configuration before creating it." />
+
+                        <Border
+                            Padding="14,12"
+                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <TextBlock
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Text="{x:Bind ViewModel.ReviewSummary, Mode=OneWay}"
+                                TextWrapping="WrapWholeWords" />
+                        </Border>
+
+                        <Button
+                            Command="{x:Bind ViewModel.CreateContainerCommand}"
+                            IsEnabled="{x:Bind GetCreateEnabled(ViewModel.IsCreating, ViewModel.CreateSucceeded), Mode=OneWay}"
+                            Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                <TextBlock Text="Create Container" />
+                            </StackPanel>
+                        </Button>
+
+                        <!--  Success state  -->
+                        <StackPanel
+                            Spacing="8"
+                            Visibility="{x:Bind GetSuccessVisibility(ViewModel.CreateSucceeded), Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon
+                                    FontSize="14"
+                                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                    Glyph="&#xE73E;" />
+                                <TextBlock
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                    Text="Container created successfully!"
+                                    VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock
+                                FontFamily="Consolas"
+                                FontSize="11"
+                                Opacity="0.65"
+                                Text="{x:Bind ViewModel.CreatedContainerId, Mode=OneWay}" />
+                            <Button Click="ResetWizardButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="12" Glyph="&#xE72C;" />
+                                    <TextBlock Text="Create Another" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!--  Navigation bar  -->
+        <Border
+            Grid.Row="2"
+            Padding="14,10"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    Grid.Column="0"
+                    Command="{x:Bind ViewModel.GoPreviousCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoPrevious, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="12" Glyph="&#xE76B;" />
+                        <TextBlock Text="Previous" />
+                    </StackPanel>
+                </Button>
+
+                <TextBlock
+                    Grid.Column="1"
+                    FontSize="11"
+                    HorizontalAlignment="Center"
+                    Opacity="0.6"
+                    Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis"
+                    VerticalAlignment="Center" />
+
+                <Button
+                    Grid.Column="2"
+                    Command="{x:Bind ViewModel.GoNextCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoNext, Mode=OneWay}"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Visibility="{x:Bind GetHideOnCreateStep(ViewModel.IsCreateStep), Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Next" />
+                        <FontIcon FontSize="12" Glyph="&#xE76C;" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
 </Page>

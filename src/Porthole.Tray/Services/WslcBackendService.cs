@@ -426,6 +426,74 @@ internal sealed class WslcBackendService : IDisposable
         throw new NotSupportedException("The current Microsoft.WSL.Containers SDK does not expose an image prune API.");
     }
 
+    public async Task<string> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(config.Name))
+        {
+            throw new InvalidOperationException("Container name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(config.ImageReference))
+        {
+            throw new InvalidOperationException("Image reference is required.");
+        }
+
+        var args = new System.Text.StringBuilder("run --detach");
+
+        args.Append(" --name ");
+        args.Append(EscapeCliArgument(config.Name.Trim()));
+
+        if (config.PortMappings is not null)
+        {
+            foreach (string port in config.PortMappings)
+            {
+                if (!string.IsNullOrWhiteSpace(port))
+                {
+                    args.Append(" --publish ");
+                    args.Append(EscapeCliArgument(port.Trim()));
+                }
+            }
+        }
+
+        if (config.EnvironmentVariables is not null)
+        {
+            foreach (string env in config.EnvironmentVariables)
+            {
+                if (!string.IsNullOrWhiteSpace(env))
+                {
+                    args.Append(" --env ");
+                    args.Append(EscapeCliArgument(env.Trim()));
+                }
+            }
+        }
+
+        if (config.VolumeMounts is not null)
+        {
+            foreach (string vol in config.VolumeMounts)
+            {
+                if (!string.IsNullOrWhiteSpace(vol))
+                {
+                    args.Append(" --volume ");
+                    args.Append(EscapeCliArgument(vol.Trim()));
+                }
+            }
+        }
+
+        args.Append(' ');
+        args.Append(EscapeCliArgument(config.ImageReference.Trim()));
+
+        if (!string.IsNullOrWhiteSpace(config.StartupCommand))
+        {
+            args.Append(' ');
+            args.Append(config.StartupCommand.Trim());
+        }
+
+        string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);
+        return output.Trim();
+    }
+
     public void Dispose()
     {
         lock (_syncLock)

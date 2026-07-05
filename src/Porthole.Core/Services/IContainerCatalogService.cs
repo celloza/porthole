@@ -17,4 +17,6 @@ public interface IContainerCatalogService
     Task StopContainerAsync(ContainerSummary container, CancellationToken cancellationToken = default);
 
     Task RemoveContainerAsync(ContainerSummary container, CancellationToken cancellationToken = default);
+
+    Task<string> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default);
 }

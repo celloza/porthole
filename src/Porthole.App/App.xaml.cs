@@ -50,6 +50,7 @@ public partial class App : Application
         services.AddTransient<ContainersViewModel>();
         services.AddTransient<SessionViewModel>();
         services.AddTransient<NetworkingViewModel>();
+        services.AddTransient<RunWizardViewModel>();
 
         return services.BuildServiceProvider();
     }

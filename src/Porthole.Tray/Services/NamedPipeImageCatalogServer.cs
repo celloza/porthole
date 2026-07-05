@@ -206,6 +206,17 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Container remove complete."));
                         Log("Container remove response sent.");
                         break;
+                    case ImageCatalogOperation.CreateContainer:
+                        string containerId = await ExecuteWithTimeoutAsync(
+                            token => backendService.CreateContainerAsync(
+                                request.ContainerConfig ?? throw new IOException("Container configuration is required."),
+                                token),
+                            TimeSpan.FromMinutes(2),
+                            cancellationToken,
+                            "Create container request timed out.");
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: containerId));
+                        Log("Create container response sent.");
+                        break;
                     case ImageCatalogOperation.Pull:
                         await backendService.PullImageAsync(
                             request.ImageReference ?? throw new IOException("Image reference is required."),

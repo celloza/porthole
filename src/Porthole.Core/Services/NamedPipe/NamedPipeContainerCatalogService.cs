@@ -89,6 +89,16 @@ public sealed class NamedPipeContainerCatalogService : IContainerCatalogService
         return SendContainerActionAsync(ImageCatalogOperation.RemoveContainer, container, cancellationToken);
     }
 
+    public async Task<string> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
+    {
+        var response = await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.CreateContainer, ContainerConfig: config),
+            progress: null,
+            cancellationToken);
+
+        return response.Message ?? string.Empty;
+    }
+
     private static async Task SendContainerActionAsync(ImageCatalogOperation operation, ContainerSummary container, CancellationToken cancellationToken)
     {
         string containerReference = string.IsNullOrWhiteSpace(container.Name)

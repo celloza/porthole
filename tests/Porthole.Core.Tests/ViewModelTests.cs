@@ -186,6 +186,250 @@ public class ViewModelTests
         Assert.Equal("2 running / 0 stopped", viewModel.RunningCountLabel);
     }
 
+    [Fact]
+    public async Task RunWizardViewModel_InitialState_IsStepOne()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        Assert.Equal(1, viewModel.CurrentStep);
+        Assert.True(viewModel.IsStepOneActive);
+        Assert.False(viewModel.IsStepTwoActive);
+        Assert.False(viewModel.IsStepThreeActive);
+        Assert.False(viewModel.CanGoPrevious);
+        Assert.False(viewModel.CanGoNext);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_ValidStep1_EnablesNext()
+    {
+        var images = new List<ImageSummary>
+        {
+            new("sha256:abc", "alpine", "latest", "just now", "8 MB", "alpine:latest"),
+        };
+
+        var imageService = new FakeImageCatalogService(images);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        await viewModel.LoadImagesAsync();
+
+        viewModel.ContainerName = "my-container";
+
+        Assert.True(viewModel.CanGoNext);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_InvalidContainerName_ShowsValidation()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.ContainerName = "!invalid name";
+
+        Assert.NotEmpty(viewModel.ContainerNameValidation);
+        Assert.False(viewModel.CanGoNext);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_GoNext_AdvancesToStepTwo()
+    {
+        var images = new List<ImageSummary>
+        {
+            new("sha256:abc", "alpine", "latest", "just now", "8 MB", "alpine:latest"),
+        };
+
+        var imageService = new FakeImageCatalogService(images);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        await viewModel.LoadImagesAsync();
+        viewModel.ContainerName = "test-container";
+
+        viewModel.GoNextCommand.Execute(null);
+
+        Assert.Equal(2, viewModel.CurrentStep);
+        Assert.True(viewModel.IsStepTwoActive);
+        Assert.True(viewModel.CanGoPrevious);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddPortMapping_ValidFormat_AddsToList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewPortMapping = "8080:80";
+        viewModel.AddPortMappingCommand.Execute(null);
+
+        Assert.Single(viewModel.PortMappings);
+        Assert.Equal("8080:80", viewModel.PortMappings[0]);
+        Assert.Empty(viewModel.NewPortMapping);
+        Assert.Empty(viewModel.PortMappingValidation);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddPortMapping_InvalidFormat_ShowsError()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewPortMapping = "not-a-port";
+        viewModel.AddPortMappingCommand.Execute(null);
+
+        Assert.Empty(viewModel.PortMappings);
+        Assert.NotEmpty(viewModel.PortMappingValidation);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddPortMapping_WithProtocol_AddsToList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewPortMapping = "8080:80/tcp";
+        viewModel.AddPortMappingCommand.Execute(null);
+
+        Assert.Single(viewModel.PortMappings);
+        Assert.Equal("8080:80/tcp", viewModel.PortMappings[0]);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_RemovePortMapping_RemovesFromList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewPortMapping = "8080:80";
+        viewModel.AddPortMappingCommand.Execute(null);
+        viewModel.RemovePortMappingCommand.Execute("8080:80");
+
+        Assert.Empty(viewModel.PortMappings);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddEnvVar_ValidFormat_AddsToList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewEnvironmentVariable = "MY_VAR=hello";
+        viewModel.AddEnvironmentVariableCommand.Execute(null);
+
+        Assert.Single(viewModel.EnvironmentVariables);
+        Assert.Equal("MY_VAR=hello", viewModel.EnvironmentVariables[0]);
+        Assert.Empty(viewModel.EnvVarValidation);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddEnvVar_InvalidFormat_ShowsError()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewEnvironmentVariable = "NOEQUALSIGN";
+        viewModel.AddEnvironmentVariableCommand.Execute(null);
+
+        Assert.Empty(viewModel.EnvironmentVariables);
+        Assert.NotEmpty(viewModel.EnvVarValidation);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_AddVolumeMount_AddsToList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewVolumeMount = "myvolume:/app/data";
+        viewModel.AddVolumeMountCommand.Execute(null);
+
+        Assert.Single(viewModel.VolumeMounts);
+        Assert.Equal("myvolume:/app/data", viewModel.VolumeMounts[0]);
+        Assert.Empty(viewModel.VolumeMountValidation);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_CreateContainer_Success_UpdatesStatus()
+    {
+        var images = new List<ImageSummary>
+        {
+            new("sha256:abc", "alpine", "latest", "just now", "8 MB", "alpine:latest"),
+        };
+
+        var imageService = new FakeImageCatalogService(images);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        await viewModel.LoadImagesAsync();
+        viewModel.ContainerName = "test-container";
+        viewModel.GoNextCommand.Execute(null); // step 2
+        viewModel.GoNextCommand.Execute(null); // step 3
+
+        await viewModel.CreateContainerCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.CreateSucceeded);
+        Assert.Contains("test-container", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_Reset_ClearsAllState()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.ContainerName = "test-container";
+        viewModel.NewPortMapping = "8080:80";
+        viewModel.AddPortMappingCommand.Execute(null);
+
+        viewModel.Reset();
+
+        Assert.Equal(1, viewModel.CurrentStep);
+        Assert.Empty(viewModel.ContainerName);
+        Assert.Empty(viewModel.PortMappings);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_ReviewSummary_ContainsAllSettings()
+    {
+        var images = new List<ImageSummary>
+        {
+            new("sha256:abc", "nginx", "latest", "just now", "50 MB", "nginx:latest"),
+        };
+
+        var imageService = new FakeImageCatalogService(images);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        await viewModel.LoadImagesAsync();
+        viewModel.ContainerName = "web-server";
+        viewModel.StartupCommand = "/bin/sh";
+        viewModel.NewPortMapping = "8080:80";
+        viewModel.AddPortMappingCommand.Execute(null);
+        viewModel.NewEnvironmentVariable = "ENV=prod";
+        viewModel.AddEnvironmentVariableCommand.Execute(null);
+
+        viewModel.GoNextCommand.Execute(null); // step 2
+        viewModel.GoNextCommand.Execute(null); // step 3
+
+        string summary = viewModel.ReviewSummary;
+
+        Assert.Contains("web-server", summary);
+        Assert.Contains("nginx:latest", summary);
+        Assert.Contains("/bin/sh", summary);
+        Assert.Contains("8080:80", summary);
+        Assert.Contains("ENV=prod", summary);
+    }
+
     private sealed class FakeImageCatalogService(IReadOnlyList<ImageSummary> images) : IImageCatalogService
     {
         public Task<IReadOnlyList<ImageSummary>> ListImagesAsync(CancellationToken cancellationToken = default)
@@ -249,6 +493,11 @@ public class ViewModelTests
         public Task RemoveContainerAsync(ContainerSummary container, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
+        }
+
+        public Task<string> CreateContainerAsync(ContainerConfig config, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult($"fake-container-id-{config.Name}");
         }
     }
 
