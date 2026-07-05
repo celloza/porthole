@@ -38,8 +38,22 @@ jobs:
       - name: Validate tag commit is on main
         shell: pwsh
         run: |
-          git fetch origin main --depth=1
-          if (-not (git merge-base --is-ancestor $env:GITHUB_SHA origin/main)) {
+          $tag = if ("${{ github.event_name }}" -eq "push") { "${{ github.ref_name }}" } else { "${{ inputs.tag }}" }
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            Write-Error "Tag is required for release validation."
+            exit 1
+          }
+
+          git fetch origin main
+          git fetch --tags origin
+
+          $targetSha = (git rev-list -n 1 $tag)
+          if ([string]::IsNullOrWhiteSpace($targetSha)) {
+            Write-Error "Unable to resolve tag '$tag' to a commit SHA."
+            exit 1
+          }
+
+          if (-not (git merge-base --is-ancestor $targetSha origin/main)) {
             Write-Error "The release tag commit is not contained in origin/main. Tag from main to release."
             exit 1
           }

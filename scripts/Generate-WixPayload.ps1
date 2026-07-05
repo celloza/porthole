@@ -34,18 +34,6 @@ function Escape-Xml {
     return [System.Security.SecurityElement]::Escape($Value)
 }
 
-function Get-RelativePath {
-    param(
-        [string]$BasePath,
-        [string]$Path
-    )
-
-    $baseUri = [Uri]((Resolve-Path -LiteralPath $BasePath).Path.TrimEnd('\\') + '\\')
-    $pathUri = [Uri](Resolve-Path -LiteralPath $Path).Path
-    $relativeUri = $baseUri.MakeRelativeUri($pathUri)
-    return [Uri]::UnescapeDataString($relativeUri.ToString()).Replace('/', '\\')
-}
-
 function New-PayloadMetadata {
     param(
         [Parameter(Mandatory = $true)]

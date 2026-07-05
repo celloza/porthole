@@ -8,15 +8,10 @@
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
     <DefineConstants>
       ProductVersion=$(ProductVersion);
-      StageDir=$(MSBuildProjectDirectory)\obj\$(Configuration)\payload
     </DefineConstants>
     <OutputName>Porthole-$(ProductVersion)-$(InstallerPlatform)</OutputName>
     <GeneratedPayloadWxs>$(MSBuildProjectDirectory)\obj\$(Configuration)\GeneratedPayload.wxs</GeneratedPayloadWxs>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="WixToolset.Util.wixext" Version="4.0.5" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Product.wxs" />
