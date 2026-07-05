@@ -9,6 +9,7 @@ namespace Porthole_App;
 public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
+    public static Window? AppWindow { get; private set; }
     public static string DiagnosticsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Porthole");
@@ -29,6 +30,7 @@ public partial class App : Application
     {
         TraceStartup("OnLaunched start");
         _window = new MainWindow();
+        AppWindow = _window;
         TraceStartup("MainWindow created");
         _window.Activate();
         TraceStartup("MainWindow activated");

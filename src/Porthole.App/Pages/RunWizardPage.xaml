@@ -51,6 +51,97 @@
             <ScrollViewer Padding="20">
                 <StackPanel Spacing="20">
 
+                    <!--  Step 0: Template Choice  -->
+                    <StackPanel
+                        Spacing="16"
+                        Visibility="{x:Bind GetStepVisibility(ViewModel.IsTemplateChoiceStep), Mode=OneWay}">
+
+                        <TextBlock
+                            FontSize="20"
+                            FontWeight="SemiBold"
+                            Text="Start a Container Configuration" />
+
+                        <TextBlock
+                            FontSize="13"
+                            Opacity="0.72"
+                            Text="Load a saved template from a JSON file, or create a new container configuration from scratch." />
+
+                        <Grid
+                            MinHeight="400"
+                            ColumnSpacing="24"
+                            VerticalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button
+                                Grid.Column="0"
+                                Click="LoadTemplateButton_Click"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Padding="28"
+                                CornerRadius="12"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="10">
+                                    <FontIcon
+                                        FontSize="80"
+                                        Glyph="&#xE8A5;"
+                                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                        HorizontalAlignment="Center" />
+                                    <TextBlock
+                                        Margin="0,8,0,0"
+                                        FontSize="24"
+                                        FontWeight="Bold"
+                                        HorizontalAlignment="Center"
+                                        Text="Use Template File" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Opacity="0.9"
+                                        HorizontalAlignment="Center"
+                                        Text="Load JSON config and continue" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                Grid.Column="1"
+                                Click="CreateNewButton_Click"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Padding="28"
+                                CornerRadius="12"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="10">
+                                    <FontIcon
+                                        FontSize="80"
+                                        Glyph="&#xE710;"
+                                        HorizontalAlignment="Center" />
+                                    <TextBlock
+                                        Margin="0,8,0,0"
+                                        FontSize="24"
+                                        FontWeight="Bold"
+                                        HorizontalAlignment="Center"
+                                        Text="Create New" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Opacity="0.8"
+                                        HorizontalAlignment="Center"
+                                        Text="Start with empty settings" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
                     <!--  Step 1: Basic Settings  -->
                     <StackPanel
                         Spacing="16"
@@ -316,15 +407,23 @@
                                 TextWrapping="WrapWholeWords" />
                         </Border>
 
-                        <Button
-                            Command="{x:Bind ViewModel.CreateContainerCommand}"
-                            IsEnabled="{x:Bind GetCreateEnabled(ViewModel.IsCreating, ViewModel.CreateSucceeded), Mode=OneWay}"
-                            Style="{StaticResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon FontSize="12" Glyph="&#xE710;" />
-                                <TextBlock Text="Create Container" />
-                            </StackPanel>
-                        </Button>
+                        <SplitButton
+                            Click="SaveAndRunSplitButton_Click"
+                            IsEnabled="{x:Bind GetRunActionsEnabled(ViewModel.IsCreating, ViewModel.CreateSucceeded), Mode=OneWay}">
+                            <SplitButton.Content>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                    <TextBlock Text="Save Template and Run" />
+                                </StackPanel>
+                            </SplitButton.Content>
+                            <SplitButton.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem
+                                        Click="RunWithoutSavingMenuItem_Click"
+                                        Text="Run Without Saving" />
+                                </MenuFlyout>
+                            </SplitButton.Flyout>
+                        </SplitButton>
 
                         <!--  Success state  -->
                         <StackPanel
@@ -398,7 +497,7 @@
                     Command="{x:Bind ViewModel.GoNextCommand}"
                     IsEnabled="{x:Bind ViewModel.CanGoNext, Mode=OneWay}"
                     Style="{StaticResource AccentButtonStyle}"
-                    Visibility="{x:Bind GetHideOnCreateStep(ViewModel.IsCreateStep), Mode=OneWay}">
+                    Visibility="{x:Bind GetNextButtonVisibility(ViewModel.IsTemplateChoiceStep, ViewModel.IsCreateStep), Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Next" />
                         <FontIcon FontSize="12" Glyph="&#xE76C;" />

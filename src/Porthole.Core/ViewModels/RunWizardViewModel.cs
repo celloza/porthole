@@ -12,7 +12,8 @@ public partial class RunWizardViewModel : ObservableObject
     private static readonly Regex ContainerNameRegex = new(@"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", RegexOptions.Compiled);
     private static readonly Regex PortMappingRegex = new(@"^\d+:\d+(/(tcp|udp))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EnvVarRegex = new(@"^[^=]+=.*$", RegexOptions.Compiled);
-    private static readonly Regex VolumeMountRegex = new(@"^[^:]+:[^:]+(:[^:]+)?$", RegexOptions.Compiled);
+    // Allow either a regular source path/name or a Windows drive source like C:\data.
+    private static readonly Regex VolumeMountRegex = new(@"^((?:[a-zA-Z]:[\\/][^:]+)|(?:[^:]+)):[^:]+(:[^:]+)?$", RegexOptions.Compiled);
 
     private readonly IImageCatalogService _imageCatalogService;
     private readonly IContainerCatalogService _containerCatalogService;
@@ -22,11 +23,12 @@ public partial class RunWizardViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsStepOneActive))]
     [NotifyPropertyChangedFor(nameof(IsStepTwoActive))]
     [NotifyPropertyChangedFor(nameof(IsStepThreeActive))]
+    [NotifyPropertyChangedFor(nameof(IsTemplateChoiceStep))]
     [NotifyPropertyChangedFor(nameof(StepTitle))]
     [NotifyPropertyChangedFor(nameof(CanGoNext))]
     [NotifyPropertyChangedFor(nameof(CanGoPrevious))]
     [NotifyPropertyChangedFor(nameof(IsCreateStep))]
-    private int currentStep = 1;
+    private int currentStep;
 
     // Step 1: Basic Settings
     [ObservableProperty]
@@ -63,7 +65,7 @@ public partial class RunWizardViewModel : ObservableObject
 
     // Status
     [ObservableProperty]
-    private string statusMessage = "Configure a new container using the steps below.";
+    private string statusMessage = "Choose to start from a template file or create a new configuration.";
 
     [ObservableProperty]
     private bool isCreating;
@@ -91,17 +93,19 @@ public partial class RunWizardViewModel : ObservableObject
     public bool IsStepOneActive => CurrentStep == 1;
     public bool IsStepTwoActive => CurrentStep == 2;
     public bool IsStepThreeActive => CurrentStep == 3;
+    public bool IsTemplateChoiceStep => CurrentStep == 0;
     public bool IsCreateStep => CurrentStep == 3;
 
     public string StepTitle => CurrentStep switch
     {
+        0 => "Start — Choose Template",
         1 => "Step 1 of 3 — Basic Settings",
         2 => "Step 2 of 3 — Advanced Settings",
         3 => "Step 3 of 3 — Review & Create",
         _ => string.Empty,
     };
 
-    public bool CanGoPrevious => CurrentStep > 1 && !IsCreating;
+    public bool CanGoPrevious => CurrentStep > 0 && !IsCreating;
 
     public bool CanGoNext => CurrentStep < 3 && !IsCreating && IsCurrentStepValid();
 
@@ -166,9 +170,15 @@ public partial class RunWizardViewModel : ObservableObject
                 AvailableImages.Add(image);
             }
 
-            SelectedImage = SelectedImage is not null && AvailableImages.Contains(SelectedImage)
-                ? SelectedImage
-                : AvailableImages.FirstOrDefault();
+            if (SelectedImage is not null)
+            {
+                EnsureImageOptionExists(SelectedImage.Reference);
+                SelectedImage = AvailableImages.FirstOrDefault(i => string.Equals(i.Reference, SelectedImage.Reference, StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                SelectedImage = AvailableImages.FirstOrDefault();
+            }
         }
         catch (Exception ex)
         {
@@ -182,7 +192,7 @@ public partial class RunWizardViewModel : ObservableObject
 
     public void Reset()
     {
-        CurrentStep = 1;
+        CurrentStep = 0;
         ContainerName = string.Empty;
         SelectedImage = AvailableImages.FirstOrDefault();
         StartupCommand = string.Empty;
@@ -195,10 +205,93 @@ public partial class RunWizardViewModel : ObservableObject
         PortMappings.Clear();
         EnvironmentVariables.Clear();
         VolumeMounts.Clear();
-        StatusMessage = "Configure a new container using the steps below.";
+        StatusMessage = "Choose to start from a template file or create a new configuration.";
         IsCreating = false;
         CreateSucceeded = false;
         CreatedContainerId = string.Empty;
+    }
+
+    public void StartNewConfiguration()
+    {
+        CurrentStep = 1;
+        StatusMessage = "Configure a new container using the steps below.";
+    }
+
+    public void ApplyTemplate(ContainerConfig config)
+    {
+        ContainerName = config.Name;
+        StartupCommand = config.StartupCommand ?? string.Empty;
+
+        PortMappings.Clear();
+        if (config.PortMappings is not null)
+        {
+            foreach (string mapping in config.PortMappings.Where(m => !string.IsNullOrWhiteSpace(m)))
+            {
+                PortMappings.Add(mapping.Trim());
+            }
+        }
+
+        EnvironmentVariables.Clear();
+        if (config.EnvironmentVariables is not null)
+        {
+            foreach (string envVar in config.EnvironmentVariables.Where(v => !string.IsNullOrWhiteSpace(v)))
+            {
+                EnvironmentVariables.Add(envVar.Trim());
+            }
+        }
+
+        VolumeMounts.Clear();
+        if (config.VolumeMounts is not null)
+        {
+            foreach (string volume in config.VolumeMounts.Where(v => !string.IsNullOrWhiteSpace(v)))
+            {
+                VolumeMounts.Add(volume.Trim());
+            }
+        }
+
+        PortMappingValidation = string.Empty;
+        EnvVarValidation = string.Empty;
+        VolumeMountValidation = string.Empty;
+        CreateSucceeded = false;
+        CreatedContainerId = string.Empty;
+
+        EnsureImageOptionExists(config.ImageReference);
+        SelectedImage = AvailableImages.FirstOrDefault(i => string.Equals(i.Reference, config.ImageReference, StringComparison.OrdinalIgnoreCase));
+
+        CurrentStep = 1;
+        StatusMessage = $"Template loaded from file. Ready to review and run '{ContainerName}'.";
+        OnPropertyChanged(nameof(ReviewSummary));
+    }
+
+    public bool TryBuildContainerConfig(out ContainerConfig? config, out string validationMessage)
+    {
+        string name = ContainerName.Trim();
+        string imageRef = SelectedImage?.Reference ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(name) || !ContainerNameRegex.IsMatch(name))
+        {
+            validationMessage = "Container name is invalid. Use letters, digits, hyphens, or underscores.";
+            config = null;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(imageRef))
+        {
+            validationMessage = "No image selected.";
+            config = null;
+            return false;
+        }
+
+        config = new ContainerConfig(
+            name,
+            imageRef,
+            string.IsNullOrWhiteSpace(StartupCommand) ? null : StartupCommand.Trim(),
+            PortMappings.Count > 0 ? [.. PortMappings] : null,
+            EnvironmentVariables.Count > 0 ? [.. EnvironmentVariables] : null,
+            VolumeMounts.Count > 0 ? [.. VolumeMounts] : null);
+
+        validationMessage = string.Empty;
+        return true;
     }
 
     [RelayCommand]
@@ -327,20 +420,13 @@ public partial class RunWizardViewModel : ObservableObject
             return;
         }
 
-        string name = ContainerName.Trim();
-        string imageRef = SelectedImage?.Reference ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(name) || !ContainerNameRegex.IsMatch(name))
+        if (!TryBuildContainerConfig(out ContainerConfig? config, out string validationMessage) || config is null)
         {
-            StatusMessage = "Container name is invalid. Go back to Step 1 and correct it.";
+            StatusMessage = $"Cannot run container: {validationMessage}";
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(imageRef))
-        {
-            StatusMessage = "No image selected. Go back to Step 1 and select an image.";
-            return;
-        }
+        string name = config.Name;
 
         IsCreating = true;
         OnPropertyChanged(nameof(CanGoNext));
@@ -349,14 +435,6 @@ public partial class RunWizardViewModel : ObservableObject
 
         try
         {
-            var config = new ContainerConfig(
-                name,
-                imageRef,
-                string.IsNullOrWhiteSpace(StartupCommand) ? null : StartupCommand.Trim(),
-                PortMappings.Count > 0 ? [.. PortMappings] : null,
-                EnvironmentVariables.Count > 0 ? [.. EnvironmentVariables] : null,
-                VolumeMounts.Count > 0 ? [.. VolumeMounts] : null);
-
             string containerId = await _containerCatalogService.CreateContainerAsync(config, cancellationToken);
 
             CreatedContainerId = containerId;
@@ -390,6 +468,32 @@ public partial class RunWizardViewModel : ObservableObject
             2 => true,
             _ => false,
         };
+    }
+
+    private void EnsureImageOptionExists(string imageReference)
+    {
+        if (string.IsNullOrWhiteSpace(imageReference)
+            || AvailableImages.Any(i => string.Equals(i.Reference, imageReference, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        string repository = imageReference;
+        string tag = "latest";
+        int tagSeparator = imageReference.LastIndexOf(':');
+        if (tagSeparator > 0 && tagSeparator > imageReference.LastIndexOf('/'))
+        {
+            repository = imageReference[..tagSeparator];
+            tag = imageReference[(tagSeparator + 1)..];
+        }
+
+        AvailableImages.Insert(0, new ImageSummary(
+            $"template:{imageReference}",
+            repository,
+            tag,
+            "from template",
+            "n/a",
+            imageReference));
     }
 
     partial void OnContainerNameChanged(string value)

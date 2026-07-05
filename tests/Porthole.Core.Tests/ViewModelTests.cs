@@ -187,14 +187,15 @@ public class ViewModelTests
     }
 
     [Fact]
-    public void RunWizardViewModel_InitialState_IsStepOne()
+    public void RunWizardViewModel_InitialState_IsTemplateChoiceStep()
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
-        Assert.Equal(1, viewModel.CurrentStep);
-        Assert.True(viewModel.IsStepOneActive);
+        Assert.Equal(0, viewModel.CurrentStep);
+        Assert.True(viewModel.IsTemplateChoiceStep);
+        Assert.False(viewModel.IsStepOneActive);
         Assert.False(viewModel.IsStepTwoActive);
         Assert.False(viewModel.IsStepThreeActive);
         Assert.False(viewModel.CanGoPrevious);
@@ -214,6 +215,7 @@ public class ViewModelTests
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
         await viewModel.LoadImagesAsync();
+        viewModel.StartNewConfiguration();
 
         viewModel.ContainerName = "my-container";
 
@@ -226,6 +228,8 @@ public class ViewModelTests
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
 
         viewModel.ContainerName = "!invalid name";
 
@@ -246,6 +250,7 @@ public class ViewModelTests
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
         await viewModel.LoadImagesAsync();
+        viewModel.StartNewConfiguration();
         viewModel.ContainerName = "test-container";
 
         viewModel.GoNextCommand.Execute(null);
@@ -261,6 +266,8 @@ public class ViewModelTests
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
 
         viewModel.NewPortMapping = "8080:80";
         viewModel.AddPortMappingCommand.Execute(null);
@@ -278,6 +285,8 @@ public class ViewModelTests
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
+        viewModel.StartNewConfiguration();
+
         viewModel.NewPortMapping = "not-a-port";
         viewModel.AddPortMappingCommand.Execute(null);
 
@@ -291,6 +300,8 @@ public class ViewModelTests
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
 
         viewModel.NewPortMapping = "8080:80/tcp";
         viewModel.AddPortMappingCommand.Execute(null);
@@ -306,6 +317,8 @@ public class ViewModelTests
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
+        viewModel.StartNewConfiguration();
+
         viewModel.NewPortMapping = "8080:80";
         viewModel.AddPortMappingCommand.Execute(null);
         viewModel.RemovePortMappingCommand.Execute("8080:80");
@@ -319,6 +332,8 @@ public class ViewModelTests
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
 
         viewModel.NewEnvironmentVariable = "MY_VAR=hello";
         viewModel.AddEnvironmentVariableCommand.Execute(null);
@@ -335,6 +350,8 @@ public class ViewModelTests
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
+        viewModel.StartNewConfiguration();
+
         viewModel.NewEnvironmentVariable = "NOEQUALSIGN";
         viewModel.AddEnvironmentVariableCommand.Execute(null);
 
@@ -349,6 +366,8 @@ public class ViewModelTests
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
+        viewModel.StartNewConfiguration();
+
         viewModel.NewVolumeMount = "myvolume:/app/data";
         viewModel.AddVolumeMountCommand.Execute(null);
 
@@ -358,11 +377,30 @@ public class ViewModelTests
     }
 
     [Fact]
+    public void RunWizardViewModel_AddVolumeMount_WindowsPath_AddsToList()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
+
+        viewModel.NewVolumeMount = "C:\\data:/app/data";
+        viewModel.AddVolumeMountCommand.Execute(null);
+
+        Assert.Single(viewModel.VolumeMounts);
+        Assert.Equal("C:\\data:/app/data", viewModel.VolumeMounts[0]);
+        Assert.Empty(viewModel.VolumeMountValidation);
+    }
+
+    [Fact]
     public void RunWizardViewModel_AddVolumeMount_InvalidFormat_ShowsError()
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
 
         viewModel.NewVolumeMount = "no-colon-separator";
         viewModel.AddVolumeMountCommand.Execute(null);
@@ -384,6 +422,7 @@ public class ViewModelTests
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
         await viewModel.LoadImagesAsync();
+        viewModel.StartNewConfiguration();
         viewModel.ContainerName = "test-container";
         viewModel.GoNextCommand.Execute(null); // step 2
         viewModel.GoNextCommand.Execute(null); // step 3
@@ -401,15 +440,50 @@ public class ViewModelTests
         var containerService = new FakeContainerCatalogService();
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
+        viewModel.StartNewConfiguration();
+
         viewModel.ContainerName = "test-container";
         viewModel.NewPortMapping = "8080:80";
         viewModel.AddPortMappingCommand.Execute(null);
 
         viewModel.Reset();
 
-        Assert.Equal(1, viewModel.CurrentStep);
+        Assert.Equal(0, viewModel.CurrentStep);
         Assert.Empty(viewModel.ContainerName);
         Assert.Empty(viewModel.PortMappings);
+    }
+
+    [Fact]
+    public async Task RunWizardViewModel_ApplyTemplate_PopulatesFieldsAndAdvancesToStepOne()
+    {
+        var images = new List<ImageSummary>
+        {
+            new("sha256:abc", "nginx", "latest", "just now", "50 MB", "nginx:latest"),
+        };
+
+        var imageService = new FakeImageCatalogService(images);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        await viewModel.LoadImagesAsync();
+
+        var template = new ContainerConfig(
+            "api",
+            "nginx:latest",
+            "/bin/sh -c \"echo hello\"",
+            ["8080:80"],
+            ["ENV=prod"],
+            ["C:\\data:/app/data"]);
+
+        viewModel.ApplyTemplate(template);
+
+        Assert.Equal(1, viewModel.CurrentStep);
+        Assert.Equal("api", viewModel.ContainerName);
+        Assert.Equal("/bin/sh -c \"echo hello\"", viewModel.StartupCommand);
+        Assert.Single(viewModel.PortMappings);
+        Assert.Single(viewModel.EnvironmentVariables);
+        Assert.Single(viewModel.VolumeMounts);
+        Assert.NotNull(viewModel.SelectedImage);
     }
 
     [Fact]
@@ -425,6 +499,7 @@ public class ViewModelTests
         var viewModel = new RunWizardViewModel(imageService, containerService);
 
         await viewModel.LoadImagesAsync();
+        viewModel.StartNewConfiguration();
         viewModel.ContainerName = "web-server";
         viewModel.StartupCommand = "/bin/sh";
         viewModel.NewPortMapping = "8080:80";

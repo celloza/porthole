@@ -486,8 +486,11 @@ internal sealed class WslcBackendService : IDisposable
 
         if (!string.IsNullOrWhiteSpace(config.StartupCommand))
         {
-            args.Append(' ');
-            args.Append(EscapeCliArgument(config.StartupCommand.Trim()));
+            foreach (string startupArg in SplitCommandLineArguments(config.StartupCommand.Trim()))
+            {
+                args.Append(' ');
+                args.Append(EscapeCliArgument(startupArg));
+            }
         }
 
         string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);
@@ -778,6 +781,58 @@ internal sealed class WslcBackendService : IDisposable
     {
         string escaped = value.Replace("\"", "\\\"");
         return $"\"{escaped}\"";
+    }
+
+    private static IReadOnlyList<string> SplitCommandLineArguments(string commandLine)
+    {
+        var args = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool inQuotes = false;
+        char quoteChar = '\0';
+
+        foreach (char ch in commandLine)
+        {
+            if ((ch == '"' || ch == '\'') && (!inQuotes || quoteChar == ch))
+            {
+                if (!inQuotes)
+                {
+                    inQuotes = true;
+                    quoteChar = ch;
+                }
+                else
+                {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                }
+
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    args.Add(current.ToString());
+                    current.Clear();
+                }
+
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        if (inQuotes)
+        {
+            throw new InvalidOperationException("Startup command contains an unmatched quote.");
+        }
+
+        if (current.Length > 0)
+        {
+            args.Add(current.ToString());
+        }
+
+        return args;
     }
 
     private sealed record ContainerListItem(string Id, string Name, string Image, int State);
