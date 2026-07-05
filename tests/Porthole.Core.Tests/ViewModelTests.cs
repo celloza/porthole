@@ -187,7 +187,7 @@ public class ViewModelTests
     }
 
     [Fact]
-    public async Task RunWizardViewModel_InitialState_IsStepOne()
+    public void RunWizardViewModel_InitialState_IsStepOne()
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
@@ -221,7 +221,7 @@ public class ViewModelTests
     }
 
     [Fact]
-    public async Task RunWizardViewModel_InvalidContainerName_ShowsValidation()
+    public void RunWizardViewModel_InvalidContainerName_ShowsValidation()
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();

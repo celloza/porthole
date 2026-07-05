@@ -9,7 +9,7 @@ namespace Porthole.Core.ViewModels;
 
 public partial class RunWizardViewModel : ObservableObject
 {
-    private static readonly Regex ContainerNameRegex = new(@"^[a-zA-Z0-9][a-zA-Z0-9_\-]*$", RegexOptions.Compiled);
+    private static readonly Regex ContainerNameRegex = new(@"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", RegexOptions.Compiled);
     private static readonly Regex PortMappingRegex = new(@"^\d+:\d+(/(tcp|udp))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EnvVarRegex = new(@"^[^=]+=.*$", RegexOptions.Compiled);
     private static readonly Regex VolumeMountRegex = new(@"^[^:]+:[^:]+(:[^:]+)?$", RegexOptions.Compiled);
@@ -166,7 +166,9 @@ public partial class RunWizardViewModel : ObservableObject
                 AvailableImages.Add(image);
             }
 
-            SelectedImage ??= AvailableImages.FirstOrDefault();
+            SelectedImage = SelectedImage is not null && AvailableImages.Contains(SelectedImage)
+                ? SelectedImage
+                : AvailableImages.FirstOrDefault();
         }
         catch (Exception ex)
         {

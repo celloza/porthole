@@ -27,7 +27,7 @@ public enum ImageCatalogOperation
     GetActiveSession = 24,
 
     // Container creation
-    CreateContainer = 19,
+    CreateContainer = 25,
 
     // Networking
     GetNetworkingSnapshot = 30,

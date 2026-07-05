@@ -211,7 +211,7 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                             token => backendService.CreateContainerAsync(
                                 request.ContainerConfig ?? throw new IOException("Container configuration is required."),
                                 token),
-                            TimeSpan.FromMinutes(2),
+                            ListTimeout,
                             cancellationToken,
                             "Create container request timed out.");
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: containerId));
