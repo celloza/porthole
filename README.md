@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/portholelogowithname-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/portholelogowithname.svg">
-    <img alt="My Logo" src="assets/logo-light.svg" width="200">
+    <img alt="logo" src="assets/logo-light.svg" width="200">
   </picture>
 </div>
 <div>
@@ -37,6 +37,13 @@ Real-time overview of system status and container inventory:
 - System resource utilization
 - Quick-access container controls
 
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/dashboard.png">
+    <img alt="dashboard" src="assets/dashboard.png" width="600">
+  </picture>
+</div>
+
 ### Images
 
 Manage container images in the active session:
@@ -45,6 +52,13 @@ Manage container images in the active session:
 - **Delete**: remove images (with dependency checks)
 - **Prune**: clean up unused images
 
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/images.png">
+    <img alt="dashboard" src="assets/images.png" width="600">
+  </picture>
+</div>
+
 ### Containers
 
 Lifecycle management for running containers:
@@ -52,6 +66,13 @@ Lifecycle management for running containers:
 - **Remove**: delete containers (with safety confirmation)
 - **Inspect**: view container details (ID, image, status, ports)
 - **Logs**: view recent container output (future)
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/containers.png">
+    <img alt="dashboard" src="assets/containers.png" width="600">
+  </picture>
+</div>
 
 ### Networking
 
@@ -71,6 +92,13 @@ Inspect and configure container networking in the active session:
 - Reads host Windows proxy settings from environment variables (HTTP_PROXY, HTTPS_PROXY, NO_PROXY)
 - Displays effective proxy configuration for container operations
 - Helps diagnose proxy-dependent workloads (artifact downloads, registry access, etc.)
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/networking.png">
+    <img alt="dashboard" src="assets/networking.png" width="600">
+  </picture>
+</div>
 
 ### Sessions
 
