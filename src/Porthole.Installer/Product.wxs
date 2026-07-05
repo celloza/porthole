@@ -1,19 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
     Name="Porthole"
     Manufacturer="celloza"
     Version="$(var.ProductVersion)"
     UpgradeCode="{BBF4A472-0764-4B18-B269-3AA1854A0B3F}"
-    Scope="perMachine"
+    Scope="perUser"
     InstallerVersion="500"
     Compressed="yes">
 
     <SummaryInformation Description="Porthole for Windows" Manufacturer="celloza" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of Porthole is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="PortholeAppIcon" SourceFile="..\Porthole.App\Assets\AppIcon.ico" />
+    <ui:WixUI Id="WixUI_Mondo" />
+    <WixVariable Id="WixUIDialogBmp" Value="Assets\WixUIDialog.png" />
+    <WixVariable Id="WixUIBannerBmp" Value="Assets\WixUIBanner.png" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run Porthole after setup" />
+    <Property Id="RUN_AFTER_INSTALL" Value="0" />
+    <Property Id="AUTO_START_WITH_WINDOWS" Value="1" />
+
+    <CustomAction
+      Id="LaunchPortholeAfterInstall"
+      Directory="INSTALLDIR_TRAY"
+      ExeCommand="Porthole.Tray.exe"
+      Execute="immediate"
+      Return="asyncNoWait"
+      Impersonate="yes" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="Porthole">
         <Directory Id="INSTALLDIR_APP" Name="App" />
         <Directory Id="INSTALLDIR_TRAY" Name="Tray" />
@@ -30,6 +46,7 @@
         Name="Porthole"
         Description="Launch Porthole tray and dashboard"
         Target="[INSTALLDIR_TRAY]Porthole.Tray.exe"
+        Icon="PortholeAppIcon"
         WorkingDirectory="INSTALLDIR_TRAY" />
       <RemoveFolder Id="RemoveProgramMenuDir" Directory="ProgramMenuDir" On="uninstall" />
       <RegistryValue
@@ -41,13 +58,75 @@
         KeyPath="yes" />
     </Component>
 
+    <Component Id="AutoStartOnLoginComponent" Directory="INSTALLDIR_TRAY" Guid="{ADCA9A8A-4EFC-49BC-B57B-84A42F568DF1}" Condition="AUTO_START_WITH_WINDOWS = &quot;1&quot;">
+      <RegistryValue
+        Root="HKCU"
+        Key="Software\Microsoft\Windows\CurrentVersion\Run"
+        Name="Porthole"
+        Value="&quot;[INSTALLDIR_TRAY]Porthole.Tray.exe&quot;"
+        Type="string"
+        KeyPath="yes" />
+    </Component>
+
     <Feature Id="MainFeature" Title="Porthole" Level="1" AllowAdvertise="no">
       <ComponentGroupRef Id="AppPayloadComponents" />
       <ComponentGroupRef Id="TrayPayloadComponents" />
       <ComponentRef Id="ProgramMenuShortcutComponent" />
+
+      <Feature
+        Id="AutoStartFeature"
+        Title="Automatically start Porthole when you login to Windows"
+        Description="Starts Porthole automatically when you sign in."
+        Level="1"
+        AllowAdvertise="no">
+        <ComponentRef Id="AutoStartOnLoginComponent" />
+      </Feature>
     </Feature>
+
+    <UI>
+      <Publish
+        Dialog="WelcomeDlg"
+        Control="Next"
+        Event="NewDialog"
+        Value="SetupTypeDlg"
+        Order="1000"
+        Condition="NOT Installed" />
+
+      <!-- Defensive override: if LicenseAgreementDlg is reached from built-in UI wiring,
+           route immediately into setup type flow and preserve Back navigation. -->
+      <Publish
+        Dialog="LicenseAgreementDlg"
+        Control="Back"
+        Event="NewDialog"
+        Value="WelcomeDlg"
+        Order="1000"
+        Condition="NOT Installed" />
+      <Publish
+        Dialog="LicenseAgreementDlg"
+        Control="Next"
+        Event="NewDialog"
+        Value="SetupTypeDlg"
+        Order="1000"
+        Condition="NOT Installed AND LicenseAccepted = &quot;1&quot;" />
+
+      <Publish
+        Dialog="SetupTypeDlg"
+        Control="Back"
+        Event="NewDialog"
+        Value="WelcomeDlg"
+        Order="1000"
+        Condition="NOT Installed" />
+
+      <Publish
+        Dialog="ExitDialog"
+        Control="Finish"
+        Event="DoAction"
+        Value="LaunchPortholeAfterInstall"
+        Condition="(WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 OR RUN_AFTER_INSTALL = 1) AND NOT Installed" />
+    </UI>
 
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/celloza/porthole" />
     <Property Id="ARPHELPLINK" Value="https://github.com/celloza/porthole/issues" />
+    <Property Id="ARPPRODUCTICON" Value="PortholeAppIcon" />
   </Package>
 </Wix>

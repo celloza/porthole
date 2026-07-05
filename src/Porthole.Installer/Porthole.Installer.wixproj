@@ -11,7 +11,12 @@
     </DefineConstants>
     <OutputName>Porthole-$(ProductVersion)-$(InstallerPlatform)</OutputName>
     <GeneratedPayloadWxs>$(MSBuildProjectDirectory)\obj\$(Configuration)\GeneratedPayload.wxs</GeneratedPayloadWxs>
+    <SuppressIces>ICE38;ICE64;ICE91</SuppressIces>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="4.0.5" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Product.wxs" />
@@ -32,11 +37,11 @@
     <MakeDir Directories="$(AppOutDir);$(TrayOutDir)" />
 
     <Exec
-      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.App\Porthole.App.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -o "$(AppOutDir)"'
+      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.App\Porthole.App.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained false -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -o "$(AppOutDir)"'
       WorkingDirectory="$(MSBuildProjectDirectory)" />
 
     <Exec
-      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.Tray\Porthole.Tray.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -o "$(TrayOutDir)"'
+      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.Tray\Porthole.Tray.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained false -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -o "$(TrayOutDir)"'
       WorkingDirectory="$(MSBuildProjectDirectory)" />
 
     <Exec

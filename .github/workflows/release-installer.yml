@@ -1,9 +1,10 @@
 name: Release Installer
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - published
+      - prereleased
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-installer-${{ github.ref_name }}
+  group: release-installer-${{ github.event.release.tag_name || github.ref_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -38,7 +39,7 @@ jobs:
       - name: Validate tag commit is on main
         shell: pwsh
         run: |
-          $tag = if ("${{ github.event_name }}" -eq "push") { "${{ github.ref_name }}" } else { "${{ inputs.tag }}" }
+          $tag = if ("${{ github.event_name }}" -eq "release") { "${{ github.event.release.tag_name }}" } else { "${{ inputs.tag }}" }
           if ([string]::IsNullOrWhiteSpace($tag)) {
             Write-Error "Tag is required for release validation."
             exit 1
@@ -67,10 +68,10 @@ jobs:
         id: meta
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "push") {
-            $tag = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "release") {
+            $tag = "${{ github.event.release.tag_name }}"
             $version = $tag.TrimStart("v")
-            $isPrerelease = $false
+            $isPrerelease = "${{ github.event.release.prerelease }}" -eq "true"
           }
           else {
             $tag = "${{ inputs.tag }}"
@@ -83,6 +84,19 @@ jobs:
             exit 1
           }
 
+          # MSI ProductVersion must be numeric (major.minor.build).
+          # Allow semver prerelease tags (for example v1.2.3-rc.1) while keeping
+          # the package file name tied to the full tag string.
+          if ($version -match '^(\d+\.\d+\.\d+)(?:-[0-9A-Za-z.-]+)?$') {
+            $msiVersion = $matches[1]
+          }
+          else {
+            Write-Error "Version '$version' is not a supported semver format. Use tags like v1.2.3 or v1.2.3-rc.1."
+            exit 1
+          }
+
+          $packageBaseName = "Porthole-$tag-x64"
+
           # Auto-detect semver prerelease tags like v1.2.3-rc.1, v1.2.3-beta.2, v1.2.3-alpha
           if ($tag -match '^v\d+\.\d+\.\d+-[0-9A-Za-z.-]+$') {
             $isPrerelease = $true
@@ -90,19 +104,21 @@ jobs:
 
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "msi_version=$msiVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "package_base_name=$packageBaseName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Build MSI
         shell: pwsh
         run: |
-          dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.version }} -p:Platform=x64
+          dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:OutputName=${{ steps.meta.outputs.package_base_name }} -p:Platform=x64
 
       - name: Prepare release assets
         id: assets
         shell: pwsh
         run: |
-          $version = "${{ steps.meta.outputs.version }}"
-          $msi = "src/Porthole.Installer/bin/x64/Release/Porthole-$version-x64.msi"
+          $packageBaseName = "${{ steps.meta.outputs.package_base_name }}"
+          $msi = "src/Porthole.Installer/bin/x64/Release/$packageBaseName.msi"
 
           if (-not (Test-Path -LiteralPath $msi)) {
             Write-Error "MSI not found: $msi"
