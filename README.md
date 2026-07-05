@@ -249,9 +249,9 @@ dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:Pro
 ```
 
 What this does:
-- Publishes self-contained `Porthole.App` and `Porthole.Tray` payloads for the selected architecture
+- Publishes framework-dependent (not self-contained) `Porthole.App` and `Porthole.Tray` payloads for the selected architecture
 - Stages payload files under `src/Porthole.Installer/obj/<Configuration>/payload`
-- Produces an MSI named `Porthole-<version>-<arch>.msi` under `src/Porthole.Installer/bin/<Configuration>`
+- Produces an MSI named `Porthole-<version>-<arch>.msi` under `src/Porthole.Installer/bin/<arch>/<Configuration>`
 
 Winget notes:
 - Use the MSI URL from GitHub Releases in your winget manifest (`InstallerType: msi`)
