@@ -290,6 +290,12 @@ public sealed partial class RunWizardPage : Page
 
             if (!TryGetTemplateVersion(root, out int parsedVersion))
             {
+                if (root.TryGetProperty("version", out _))
+                {
+                    error = "Template file is invalid. 'version' must be an integer.";
+                    return false;
+                }
+
                 // Legacy unversioned template format: raw ContainerConfig fields at root.
                 config = JsonSerializer.Deserialize<ContainerConfig>(root.GetRawText(), TemplateJsonOptions);
                 if (!IsValidTemplateConfig(config))
