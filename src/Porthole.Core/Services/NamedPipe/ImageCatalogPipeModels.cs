@@ -32,6 +32,12 @@ public enum ImageCatalogOperation
     // Networking
     GetNetworkingSnapshot = 30,
     SetNetworkMode = 31,
+
+    // Volume management
+    ListVolumes = 40,
+    CreateVolume = 41,
+    DeleteVolume = 42,
+    PruneVolumes = 43,
 }
 
 public enum ImageCatalogMessageKind
@@ -49,7 +55,8 @@ public sealed record ImageCatalogRequest(
     string? ContainerReference = null,
     string? SessionName = null,
     NetworkMode? NetworkMode = null,
-    ContainerConfig? ContainerConfig = null);
+    ContainerConfig? ContainerConfig = null,
+    string? VolumeName = null);
 
 public sealed record ImageCatalogResponse(
     ImageCatalogMessageKind Kind,
@@ -60,4 +67,5 @@ public sealed record ImageCatalogResponse(
     IReadOnlyList<ImageSummary>? Images = null,
     ImagePullProgress? Progress = null,
     IReadOnlyList<SessionSummary>? Sessions = null,
-    NetworkingSnapshot? NetworkingSnapshot = null);
+    NetworkingSnapshot? NetworkingSnapshot = null,
+    IReadOnlyList<VolumeSummary>? Volumes = null);

@@ -497,6 +497,116 @@ internal sealed class WslcBackendService : IDisposable
         return output.Trim();
     }
 
+    public async Task<IReadOnlyList<VolumeSummary>> ListVolumesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            // Get volume list via wslc volume ls
+            string json = await RunWslcCommandAsync("volume ls --format json", cancellationToken);
+            var items = JsonSerializer.Deserialize<List<VolumeListItem>>(json, JsonOptions) ?? [];
+
+            // Determine which volumes are in use by inspecting containers
+            HashSet<string> inUseNames = await GetVolumesInUseAsync(cancellationToken);
+
+            var volumes = items
+                .Select(v => new VolumeSummary(
+                    v.Name ?? string.Empty,
+                    v.Driver ?? "local",
+                    v.Mountpoint ?? string.Empty,
+                    null,
+                    v.UsageData?.Size is long s and > 0 ? ToSizeLabel((ulong)s) : "unknown",
+                    inUseNames.Contains(v.Name ?? string.Empty)))
+                .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return volumes;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    public async Task CreateVolumeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("Volume name is required.");
+        }
+
+        await RunWslcCommandAsync($"volume create {EscapeCliArgument(name.Trim())}", cancellationToken);
+    }
+
+    public async Task DeleteVolumeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("Volume name is required.");
+        }
+
+        await RunWslcCommandAsync($"volume rm {EscapeCliArgument(name.Trim())}", cancellationToken);
+    }
+
+    public async Task PruneVolumesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await RunWslcCommandAsync("volume prune --force", cancellationToken);
+    }
+
+    private static async Task<HashSet<string>> GetVolumesInUseAsync(CancellationToken cancellationToken)
+    {
+        var inUse = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            IReadOnlyList<ContainerListItem> containers = await GetContainersAsync(cancellationToken);
+
+            foreach (ContainerListItem container in containers)
+            {
+                try
+                {
+                    string json = await RunWslcCommandAsync($"inspect {container.Name}", cancellationToken);
+                    using JsonDocument doc = JsonDocument.Parse(json);
+
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
+                    {
+                        JsonElement containerElem = doc.RootElement[0];
+
+                        if (containerElem.TryGetProperty("Mounts", out JsonElement mounts)
+                            && mounts.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (JsonElement mount in mounts.EnumerateArray())
+                            {
+                                if (mount.TryGetProperty("Name", out JsonElement nameElem))
+                                {
+                                    string? volName = nameElem.GetString();
+                                    if (!string.IsNullOrWhiteSpace(volName))
+                                    {
+                                        inUse.Add(volName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip containers that fail to inspect
+                }
+            }
+        }
+        catch
+        {
+            // Return whatever we have
+        }
+
+        return inUse;
+    }
+
     public void Dispose()
     {
         lock (_syncLock)
@@ -883,4 +993,8 @@ internal sealed class WslcBackendService : IDisposable
     private sealed record KubectlPodStatus(string? Phase);
 
     private sealed record KubectlPodSpec(string? NodeName);
+
+    private sealed record VolumeUsageData(long? Size, int? RefCount);
+
+    private sealed record VolumeListItem(string? Name, string? Driver, string? Mountpoint, VolumeUsageData? UsageData);
 }

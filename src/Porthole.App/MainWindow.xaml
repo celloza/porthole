@@ -67,6 +67,11 @@
                         <FontIcon Glyph="&#xF785;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Volumes" Tag="volumes">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xEDA2;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Run Wizard" Tag="run-wizard">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE70F;" />

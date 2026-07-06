@@ -89,6 +89,10 @@ public sealed partial class MainWindow : Window
                     ViewModel.SetSection("Networking");
                     NavFrame.Navigate(typeof(NetworkingPage));
                     break;
+                case "volumes":
+                    ViewModel.SetSection("Volumes");
+                    NavFrame.Navigate(typeof(VolumesPage));
+                    break;
                 case "run-wizard":
                     ViewModel.SetSection("Run Wizard");
                     NavFrame.Navigate(typeof(RunWizardPage));
