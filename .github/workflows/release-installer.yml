@@ -159,7 +159,7 @@ jobs:
     needs: build-and-release
 
     env:
-      WINGETCREATE_TOKEN: ${{ fromJson(toJson(secrets))['WINGETCREATE_TOKEN'] }}
+      WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
 
     steps:
       - name: Checkout
