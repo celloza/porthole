@@ -342,6 +342,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBox
                                     Grid.Column="0"
@@ -349,11 +350,22 @@
                                     Text="{x:Bind ViewModel.NewVolumeMount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                 <Button
                                     Grid.Column="1"
+                                    AutomationProperties.Name="Pick host folder"
+                                    Click="PickHostFolderButton_Click">
+                                    <FontIcon FontSize="12" Glyph="&#xED25;" />
+                                </Button>
+                                <Button
+                                    Grid.Column="2"
                                     AutomationProperties.Name="Add volume mount"
                                     Command="{x:Bind ViewModel.AddVolumeMountCommand}">
                                     <FontIcon FontSize="12" Glyph="&#xE710;" />
                                 </Button>
                             </Grid>
+                            <TextBlock
+                                FontSize="11"
+                                Opacity="0.65"
+                                Text="{x:Bind ViewModel.NewVolumeMountTelemetry, Mode=OneWay}"
+                                TextWrapping="WrapWholeWords" />
                             <TextBlock
                                 FontSize="11"
                                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"

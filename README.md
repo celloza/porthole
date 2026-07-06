@@ -22,10 +22,10 @@ It uses a WinUI 3 application for the UI and a tray-hosted backend for container
 - ✅ **Containers**: start, stop, and remove containers
 - ✅ **Sessions**: create and manage isolated session environments for workload grouping
 - ✅ **Networking**: configure network mode (bridge vs. consomme) and inspect active port bindings and host proxy configuration
+- ✅ **Volume Management**: inspect named volumes and bind mounts, surface virtiofs telemetry, and create/delete/prune named volumes
 - ✅ **Run Wizard**: interactive container creation with template save/load, port mapping, environment variables, and volume configuration
 
 **Planned:**
-- 📋 **Volume Management**: track named volumes and virtiofs mounts with create/delete/prune operations
 - 🔒 **Enterprise Governance**: MDM registry allowlists, Defender for Endpoint integration, audit logging
 
 ## Feature Details
@@ -100,6 +100,35 @@ Inspect and configure container networking in the active session:
   </picture>
 </div>
 
+### Volume Management
+
+Inspect storage attached to the active session, including both named volumes and host-path bind mounts:
+
+**Volume Inventory**
+- Lists named volumes returned by `wslc volume ls`
+- Discovers bind mounts by inspecting containers in the active session
+- Shows source path, container target path, driver label, access mode, usage state, and throughput class
+- Flags Windows host-path mounts as virtiofs-backed shared mounts
+
+**Volume Operations**
+- **Create Volume**: create a new named volume in the active session
+- **Delete Volume**: remove an unused named volume with confirmation
+- **Prune Volumes**: remove unused named volumes in bulk
+- Bind mounts are shown for visibility and telemetry, but are not deleted from the Volumes page
+
+**Run Wizard Integration**
+- Volume mounts entered in the wizard are annotated as named volumes, virtiofs host mounts, or 9P-style Linux/WSL path mounts
+- A host-folder picker can prefill bind mounts for Windows paths
+
+See [docs/volume-management.md](docs/volume-management.md) for behavior details and limitations.
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/networking.png">
+    <img alt="dashboard" src="assets/volumes.png" width="600">
+  </picture>
+</div>
+
 ### Sessions
 
 Isolated container environments for multi-tenant and workload grouping scenarios:
@@ -127,6 +156,11 @@ Interactive guided flow for creating a container configuration and starting it:
 - Step 1: Basic settings (container name, image, optional startup command)
 - Step 2: Advanced settings (port mappings, environment variables, volume mounts)
 - Step 3: Review and run
+
+**Volume Mount Guidance**
+- Windows host paths such as `C:\data:/app/data` are labeled as virtiofs-backed bind mounts
+- Linux or WSL paths such as `/mnt/c/data:/app/data` are labeled as 9P-style host sharing
+- Named volumes such as `myvolume:/app/data` stay inside the active session storage
 
 **Run Actions**
 - Primary action: **Save Template and Run**
@@ -165,6 +199,11 @@ Interactive guided flow for creating a container configuration and starting it:
 - `src/Porthole.Core`: shared models, service contracts, and viewmodels
 - `src/Porthole.Tray`: tray host backend with WSL Containers integration
 - `tests/Porthole.Core.Tests`: unit tests
+
+## Documentation
+
+- [docs/volume-management.md](docs/volume-management.md): named volumes, bind mounts, virtiofs telemetry, and run-wizard mount guidance
+- [docs/release-workflow.md](docs/release-workflow.md): installer and GitHub release flow
 
 ## Prerequisites
 

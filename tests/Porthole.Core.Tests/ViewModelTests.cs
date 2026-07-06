@@ -629,6 +629,60 @@ public class ViewModelTests
         Assert.Equal("Unused", unused.InUseLabel);
     }
 
+    [Fact]
+    public async Task VolumesViewModel_DeleteVolume_BlockedForBindMount()
+    {
+        var volumes = new List<VolumeSummary>
+        {
+            new("src", "virtiofs", "/workspace", "C:\\src", "host path", true, true),
+        };
+
+        var service = new FakeVolumeService(volumes);
+        var viewModel = new VolumesViewModel(service);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await viewModel.DeleteVolumeCommand.ExecuteAsync(viewModel.Volumes[0]);
+
+        Assert.Empty(service.Deleted);
+        Assert.Contains("Bind mounts", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_NewVolumeMountTelemetry_FlagsVirtioFsAndNineP()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewVolumeMount = "C:\\data:/app/data:ro";
+        Assert.Contains("virtiofs", viewModel.NewVolumeMountTelemetry, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.NewVolumeMount = "/mnt/c/data:/app/data";
+        Assert.Contains("9P", viewModel.NewVolumeMountTelemetry, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_ReviewSummary_AnnotatesVolumeTransport()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
+        viewModel.ContainerName = "api";
+        viewModel.SelectedImage = new ImageSummary("sha256:test", "nginx", "latest", "just now", "1 MB", "nginx:latest");
+
+        viewModel.NewVolumeMount = "C:\\data:/app/data";
+        viewModel.AddVolumeMountCommand.Execute(null);
+        viewModel.NewVolumeMount = "myvol:/cache";
+        viewModel.AddVolumeMountCommand.Execute(null);
+
+        string summary = viewModel.ReviewSummary;
+
+        Assert.Contains("virtiofs", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("named volume", summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FakeImageCatalogService(IReadOnlyList<ImageSummary> images) : IImageCatalogService
     {
         public Task<IReadOnlyList<ImageSummary>> ListImagesAsync(CancellationToken cancellationToken = default)

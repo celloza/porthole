@@ -103,6 +103,12 @@ public partial class VolumesViewModel : ObservableObject
     [RelayCommand]
     private async Task DeleteVolumeAsync(VolumeSummary volume, CancellationToken cancellationToken = default)
     {
+        if (!volume.CanDelete)
+        {
+            StatusMessage = volume.DeleteToolTip;
+            return;
+        }
+
         IsLoading = true;
         StatusMessage = $"Deleting volume '{volume.Name}'...";
 

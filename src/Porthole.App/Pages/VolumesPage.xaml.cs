@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Porthole.Core.Models;
 using Porthole.Core.ViewModels;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Porthole_App.Pages;
 
@@ -46,6 +47,17 @@ public sealed partial class VolumesPage : Page
             {
                 await ViewModel.DeleteVolumeCommand.ExecuteAsync(volume);
             }
+        }
+    }
+
+    private void CopyMountStringButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: VolumeSummary volume })
+        {
+            var dataPackage = new DataPackage();
+            dataPackage.SetText(volume.MountString);
+            Clipboard.SetContent(dataPackage);
+            ViewModel.StatusMessage = $"Copied mount string '{volume.MountString}'.";
         }
     }
 }
