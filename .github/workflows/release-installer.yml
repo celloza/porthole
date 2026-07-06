@@ -186,11 +186,25 @@ jobs:
         run: |
           Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
 
-          $appxBundleFile = Join-Path -Path $env:TEMP -ChildPath "wingetcreate.msixbundle"
-          Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest/msixbundle" -OutFile $appxBundleFile -ErrorAction Stop
-          Add-AppxPackage -Path $appxBundleFile -ErrorAction Stop
+          if (-not (Get-Command wingetcreate -ErrorAction SilentlyContinue)) {
+            $appxBundleFile = Join-Path -Path $env:TEMP -ChildPath "wingetcreate.msixbundle"
+            Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest/msixbundle" -OutFile $appxBundleFile -ErrorAction Stop
+            Add-AppxPackage -Path $appxBundleFile -ErrorAction Stop
+          }
 
-          wingetcreate new --out "${{ steps.winget.outputs.path }}" --no-open "${{ steps.winget.outputs.installer_url }}"
+          $installerUrl = "${{ steps.winget.outputs.installer_url }}"
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
+              break
+            }
+            catch {
+              if ($attempt -eq 12) { throw }
+              Start-Sleep -Seconds 10
+            }
+          }
+
+          wingetcreate new --out "${{ steps.winget.outputs.path }}" --no-open $installerUrl
 
           winget validate --manifest "${{ steps.winget.outputs.path }}"
 
