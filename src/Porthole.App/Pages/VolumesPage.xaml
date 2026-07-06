@@ -223,10 +223,12 @@
                                         <Button
                                             Grid.Column="4"
                                             x:Name="CopyMountStringButton"
+                                            AutomationProperties.Name="Copy mount string"
                                             Click="CopyMountStringButton_Click"
+                                            IsEnabled="{x:Bind CanCopyMountString, Mode=OneTime}"
                                             Tag="{x:Bind}"
                                             VerticalAlignment="Center"
-                                            ToolTipService.ToolTip="Copy mount string">
+                                            ToolTipService.ToolTip="{x:Bind CopyMountToolTip}">
                                             <FontIcon FontSize="12" Glyph="&#xE8C8;" />
                                         </Button>
 
@@ -234,6 +236,7 @@
                                         <Button
                                             Grid.Column="5"
                                             x:Name="DeleteVolumeButton"
+                                            AutomationProperties.Name="Delete volume"
                                             Click="DeleteVolumeButton_Click"
                                             IsEnabled="{x:Bind CanDelete}"
                                             Tag="{x:Bind}"

@@ -54,6 +54,12 @@ public sealed partial class VolumesPage : Page
     {
         if (sender is Button { Tag: VolumeSummary volume })
         {
+            if (!volume.CanCopyMountString)
+            {
+                ViewModel.StatusMessage = "No mount string is available for this volume yet.";
+                return;
+            }
+
             var dataPackage = new DataPackage();
             dataPackage.SetText(volume.MountString);
             Clipboard.SetContent(dataPackage);

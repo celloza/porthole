@@ -16,6 +16,7 @@ public partial class VolumesViewModel : ObservableObject
     private string statusMessage = "Load volumes to see named volumes and bind-mounts for the active session.";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VolumeCountLabel))]
     [NotifyPropertyChangedFor(nameof(IsNotLoading))]
     private bool isLoading;
 

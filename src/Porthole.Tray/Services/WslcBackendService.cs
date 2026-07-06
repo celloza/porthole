@@ -150,7 +150,7 @@ internal sealed class WslcBackendService : IDisposable
 
                 try
                 {
-                    string json = await RunWslcCommandAsync($"inspect {container.Name}", cancellationToken);
+                    string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
                     using JsonDocument doc = JsonDocument.Parse(json);
 
                     // wslc inspect returns an array with one element
@@ -519,13 +519,14 @@ internal sealed class WslcBackendService : IDisposable
             volumes[name] = new VolumeSummary(
                 name,
                 string.IsNullOrWhiteSpace(volume.Driver) ? mount?.Driver ?? "local" : volume.Driver,
-                mount?.Destination ?? volume.Mountpoint ?? string.Empty,
+                mount?.Destination ?? string.Empty,
                 null,
                 volume.UsageData?.Size is long s && s > 0 ? ToSizeLabel((ulong)s) : "unknown",
                 mount?.IsInUse ?? false,
                 false,
                 mount?.IsReadOnly ?? false,
-                "session local");
+                "session local",
+                volume.Mountpoint);
         }
 
         foreach (MountTelemetry bindMount in mountSnapshot.BindMounts)
@@ -595,7 +596,7 @@ internal sealed class WslcBackendService : IDisposable
         {
             try
             {
-                string json = await RunWslcCommandAsync($"inspect {container.Name}", cancellationToken);
+                string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
                 using JsonDocument doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)

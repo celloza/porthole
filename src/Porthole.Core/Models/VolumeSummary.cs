@@ -9,11 +9,12 @@ public sealed record VolumeSummary(
     bool IsInUse,
     bool IsBindMount = false,
     bool IsReadOnly = false,
-    string? ThroughputClass = null)
+    string? ThroughputClass = null,
+    string? SessionMountPoint = null)
 {
-    public string DisplayName => string.IsNullOrWhiteSpace(Name)
-        ? (string.IsNullOrWhiteSpace(HostPath) ? MountPoint : HostPath)
-        : Name;
+    public string DisplayName => string.IsNullOrWhiteSpace(HostPath)
+        ? (string.IsNullOrWhiteSpace(Name) ? MountPoint : Name)
+        : HostPath;
 
     public string DriverDisplay => string.IsNullOrWhiteSpace(Driver) ? "local" : Driver;
 
@@ -31,13 +32,46 @@ public sealed record VolumeSummary(
 
     public string SourceDisplay => string.IsNullOrWhiteSpace(HostPath) ? Name : HostPath;
 
-    public string PathSummary => string.IsNullOrWhiteSpace(HostPath)
-        ? MountPoint
-        : $"{HostPath} -> {MountPoint}";
+    public string PathSummary
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(HostPath))
+            {
+                return string.IsNullOrWhiteSpace(MountPoint)
+                    ? HostPath
+                    : $"{HostPath} -> {MountPoint}";
+            }
 
-    public string MountString => string.IsNullOrWhiteSpace(HostPath)
-        ? $"{Name}:{MountPoint}"
-        : $"{HostPath}:{MountPoint}";
+            if (!string.IsNullOrWhiteSpace(MountPoint))
+            {
+                return MountPoint;
+            }
+
+            return string.IsNullOrWhiteSpace(SessionMountPoint) ? string.Empty : SessionMountPoint;
+        }
+    }
+
+    public string MountString
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(MountPoint))
+            {
+                return string.Empty;
+            }
+
+            return string.IsNullOrWhiteSpace(HostPath)
+                ? $"{Name}:{MountPoint}"
+                : $"{HostPath}:{MountPoint}";
+        }
+    }
+
+    public string CopyMountToolTip => string.IsNullOrWhiteSpace(MountString)
+        ? "No mount string available until the volume is attached to a container target path."
+        : "Copy mount string";
+
+    public bool CanCopyMountString => !string.IsNullOrWhiteSpace(MountString);
 
     public bool CanDelete => !IsBindMount && !IsInUse && !string.IsNullOrWhiteSpace(Name);
 
