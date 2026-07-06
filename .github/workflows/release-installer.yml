@@ -158,9 +158,11 @@ jobs:
     runs-on: windows-latest
     needs: build-and-release
 
+    permissions:
+      contents: read
+
     env:
       WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
