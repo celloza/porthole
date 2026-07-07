@@ -25,7 +25,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         AppVersionText = $"{GetVersionText()} - {DateTime.Now:yyyy}";
-        FooterText = $"Copyright © Porthole contributors. Licensed under GNU GPL v3.0. WSL architecture: {RuntimeInformation.ProcessArchitecture}.";
+        FooterText = $"Copyright © Porthole contributors. Licensed under GNU GPL v3.0. Process architecture: {RuntimeInformation.ProcessArchitecture}.";
 
         InitializeComponent();
 
