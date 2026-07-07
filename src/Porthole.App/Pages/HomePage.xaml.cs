@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Porthole.Core.Services.NamedPipe;
 using Porthole.Core.ViewModels;
+using System.Diagnostics;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -199,6 +200,23 @@ public sealed partial class HomePage : Page
         }
 
         return ConnectingBrush;
+    }
+
+    private void RunWslUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/k wsl --update --pre-release",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HomePage] Failed to launch wsl --update --pre-release: {ex.Message}");
+        }
     }
 
     private static bool ContainsAny(string value, params string[] terms)

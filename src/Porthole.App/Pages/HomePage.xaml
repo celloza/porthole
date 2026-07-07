@@ -18,7 +18,7 @@
                 Title="WSL Containers prerequisites are incomplete"
                 Message="{x:Bind ViewModel.MissingComponentsMessage, Mode=OneWay}">
                 <InfoBar.ActionButton>
-                    <Button Content="Run wsl --update --pre-release" />
+                    <Button Content="Run wsl --update --pre-release" Click="RunWslUpdateButton_Click" />
                 </InfoBar.ActionButton>
             </InfoBar>
 
