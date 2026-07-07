@@ -24,6 +24,7 @@ It uses a WinUI 3 application for the UI and a tray-hosted backend for container
 - ✅ **Networking**: configure network mode (bridge vs. consomme) and inspect active port bindings and host proxy configuration
 - ✅ **Volume Management**: inspect named volumes and bind mounts, surface virtiofs telemetry, and create/delete/prune named volumes
 - ✅ **Run Wizard**: interactive container creation with template save/load, port mapping, environment variables, and volume configuration
+- ✅ **Settings & About**: in-app appearance switching (System/Light/Dark) and build/version details
 
 **Planned:**
 - 🔒 **Enterprise Governance**: MDM registry allowlists, Defender for Endpoint integration, audit logging
@@ -193,6 +194,20 @@ Interactive guided flow for creating a container configuration and starting it:
 - Save picker suggests: `porthole-<imagename>-ddmmyyhhss.json`
 - Example: `porthole-nginx-0507261142.json`
 
+### Settings & About
+
+Settings now includes both runtime app preferences and project metadata in one place:
+
+**Appearance**
+- Theme selector for `System default`, `Light`, and `Dark`
+- Theme changes are applied live to the current app window
+- Caption button foreground fallback keeps close/minimize/maximize glyphs readable in both light and dark themes
+
+**About**
+- Theme-aware logo swap (`portholelogowithname.svg` and `portholelogowithname-dark.svg`)
+- Version line in the format `vX.Y.Z` or `vX.Y.Z (<metadata>)` when build metadata is available
+- Quick links for repository, license, issues, and releases
+
 ## Projects
 
 - `src/Porthole.App`: WinUI 3 desktop dashboard
@@ -258,6 +273,8 @@ dotnet build Porthole.slnx -c Debug
 ```powershell
 dotnet run --project src/Porthole.Tray -c Debug
 ```
+
+The tray host resolves the dashboard path by preferring the repository app build output and avoids activating mismatched stale `Porthole.App.exe` instances from unrelated locations.
 
 The tray host starts a named pipe server and automatically launches the dashboard. You can then reopen the dashboard by double-clicking the tray icon.
 
