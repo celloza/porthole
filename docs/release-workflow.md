@@ -19,6 +19,11 @@ This document explains how Porthole publishes MSI installer releases using GitHu
 Notes:
 - The package file name is derived from the release tag (example: `v0.2.0-rc.1` -> `Porthole-v0.2.0-rc.1-x64.msi`).
 - MSI `ProductVersion` is derived from the numeric core of the tag (`0.2.0` for `v0.2.0-rc.1`) because Windows Installer requires numeric product versions.
+- During installer build, the app publish step also receives explicit version metadata:
+   - `Version` = numeric MSI product version (`major.minor.patch`)
+   - `FileVersion` = `<ProductVersion>.0`
+   - `InformationalVersion` = `<release-version>+<commit-sha>`
+- This metadata is surfaced in-app on the Settings/About page so release builds show the intended release version string.
 
 ## Installer options shown during setup
 
@@ -52,6 +57,10 @@ The workflow supports two triggers:
      - `version` (example: `1.2.3`)
      - `tag` (example: `v1.2.3`)
      - `prerelease` (boolean)
+
+In both trigger modes, the workflow emits:
+- `msi_version`: numeric `major.minor.patch` used for MSI `ProductVersion`
+- `app_informational_version`: `<version>+<github.sha>` used for app informational metadata
 
 ## Stable vs pre-production releases
 

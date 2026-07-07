@@ -2,6 +2,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
+using Windows.UI;
 using WinRT.Interop;
 using Porthole.Core.ViewModels;
 using Porthole_App.Pages;
@@ -11,6 +12,26 @@ namespace Porthole_App;
 public sealed partial class MainWindow : Window
 {
     public ShellViewModel ViewModel { get; }
+
+    public void ApplyTheme(ElementTheme theme)
+    {
+        RootGrid.RequestedTheme = theme;
+        ContentHostGrid.RequestedTheme = theme;
+        NavView.RequestedTheme = theme;
+        AppTitleBar.RequestedTheme = theme;
+        ApplyCaptionButtonForeground(GetEffectiveTheme());
+    }
+
+    public ElementTheme GetEffectiveTheme()
+    {
+        ElementTheme requestedTheme = RootGrid.RequestedTheme;
+        return requestedTheme switch
+        {
+            ElementTheme.Dark => ElementTheme.Dark,
+            ElementTheme.Light => ElementTheme.Light,
+            _ => RootGrid.ActualTheme == ElementTheme.Dark ? ElementTheme.Dark : ElementTheme.Light,
+        };
+    }
 
     public MainWindow()
     {
@@ -22,6 +43,7 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        ApplyCaptionButtonForeground(GetEffectiveTheme());
         AppWindow.Resize(new SizeInt32(1360, 900));
         CenterWindow();
         string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
@@ -33,6 +55,25 @@ public sealed partial class MainWindow : Window
         NavFrame.Navigate(typeof(HomePage));
         App.TraceStartup($"MainWindow HWND {WindowNative.GetWindowHandle(this)}");
         App.TraceStartup("MainWindow ctor complete");
+    }
+
+    private void ApplyCaptionButtonForeground(ElementTheme effectiveTheme)
+    {
+        AppWindowTitleBar titleBar = AppWindow.TitleBar;
+        if (effectiveTheme == ElementTheme.Light)
+        {
+            titleBar.ButtonForegroundColor = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+            titleBar.ButtonHoverForegroundColor = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+            titleBar.ButtonPressedForegroundColor = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+            titleBar.ButtonInactiveForegroundColor = Color.FromArgb(0xFF, 0x69, 0x69, 0x69);
+        }
+        else
+        {
+            titleBar.ButtonForegroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            titleBar.ButtonHoverForegroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            titleBar.ButtonPressedForegroundColor = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            titleBar.ButtonInactiveForegroundColor = Color.FromArgb(0xFF, 0xD3, 0xD3, 0xD3);
+        }
     }
 
     private void CenterWindow()
@@ -88,6 +129,10 @@ public sealed partial class MainWindow : Window
                 case "networking":
                     ViewModel.SetSection("Networking");
                     NavFrame.Navigate(typeof(NetworkingPage));
+                    break;
+                case "volumes":
+                    ViewModel.SetSection("Volumes");
+                    NavFrame.Navigate(typeof(VolumesPage));
                     break;
                 case "run-wizard":
                     ViewModel.SetSection("Run Wizard");

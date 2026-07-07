@@ -52,6 +52,7 @@ public partial class RunWizardViewModel : ObservableObject
     private string newEnvironmentVariable = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewVolumeMountTelemetry))]
     private string newVolumeMount = string.Empty;
 
     [ObservableProperty]
@@ -126,6 +127,8 @@ public partial class RunWizardViewModel : ObservableObject
 
     public string SelectedImageDisplayName => SelectedImage?.DisplayName ?? "(none selected)";
 
+    public string NewVolumeMountTelemetry => DescribeVolumeMountTelemetry(NewVolumeMount);
+
     public string ReviewSummary
     {
         get
@@ -151,7 +154,7 @@ public partial class RunWizardViewModel : ObservableObject
 
             if (VolumeMounts.Count > 0)
             {
-                sb.AppendLine($"Volumes: {string.Join(", ", VolumeMounts)}");
+                sb.AppendLine($"Volumes: {string.Join(", ", VolumeMounts.Select(FormatVolumeMountForReview))}");
             }
 
             return sb.ToString().TrimEnd();
@@ -404,12 +407,31 @@ public partial class RunWizardViewModel : ObservableObject
         VolumeMounts.Add(volume);
         NewVolumeMount = string.Empty;
         VolumeMountValidation = string.Empty;
+        OnPropertyChanged(nameof(ReviewSummary));
     }
 
     [RelayCommand]
     private void RemoveVolumeMount(string volume)
     {
         VolumeMounts.Remove(volume);
+        OnPropertyChanged(nameof(ReviewSummary));
+    }
+
+    public void PrefillHostVolumeMount(string hostPath)
+    {
+        if (string.IsNullOrWhiteSpace(hostPath))
+        {
+            return;
+        }
+
+        if (TrySplitVolumeMount(NewVolumeMount.Trim(), out _, out string destination, out string options)
+            && !string.IsNullOrWhiteSpace(destination))
+        {
+            NewVolumeMount = BuildVolumeMount(hostPath.Trim(), destination, options);
+            return;
+        }
+
+        NewVolumeMount = $"{hostPath.Trim()}:/workspace";
     }
 
     [RelayCommand]
@@ -499,5 +521,133 @@ public partial class RunWizardViewModel : ObservableObject
     partial void OnContainerNameChanged(string value)
     {
         OnPropertyChanged(nameof(ContainerNameValidation));
+    }
+
+    private static string FormatVolumeMountForReview(string mount)
+    {
+        if (!TrySplitVolumeMount(mount, out string source, out string destination, out string options))
+        {
+            return mount;
+        }
+
+        string mountKind = ClassifyMountTransport(source) switch
+        {
+            VolumeMountTransport.VirtioFs => "virtiofs",
+            VolumeMountTransport.NineP => "9P",
+            _ => "named volume",
+        };
+
+        string formatted = $"{source}:{destination}";
+        if (!string.IsNullOrWhiteSpace(options))
+        {
+            formatted += $":{options}";
+        }
+
+        return $"{formatted} [{mountKind}]";
+    }
+
+    private static string DescribeVolumeMountTelemetry(string mount)
+    {
+        if (string.IsNullOrWhiteSpace(mount))
+        {
+            return "Windows host paths use virtiofs. Named volumes stay inside the active session.";
+        }
+
+        if (!TrySplitVolumeMount(mount.Trim(), out string source, out _, out string options))
+        {
+            return "Add a source and container path to preview whether this mount will use virtiofs, 9P, or a named volume.";
+        }
+
+        bool readOnly = options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(option => string.Equals(option, "ro", StringComparison.OrdinalIgnoreCase));
+        string mode = readOnly ? "read-only" : "read-write";
+
+        return ClassifyMountTransport(source) switch
+        {
+            VolumeMountTransport.VirtioFs => $"Windows host path detected. Porthole will request a {mode} virtiofs bind mount.",
+            VolumeMountTransport.NineP => $"WSL/Linux path detected. This mount may fall back to 9P-style host sharing depending on runtime support.",
+            _ => $"Named volume detected. Data stays in the active session storage and is mounted {mode}.",
+        };
+    }
+
+    private static VolumeMountTransport ClassifyMountTransport(string source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return VolumeMountTransport.NamedVolume;
+        }
+
+        if ((source.Length >= 3 && char.IsLetter(source[0]) && source[1] == ':' && (source[2] == '\\' || source[2] == '/'))
+            || source.StartsWith("\\\\", StringComparison.Ordinal))
+        {
+            return VolumeMountTransport.VirtioFs;
+        }
+
+        if (source.StartsWith("/", StringComparison.Ordinal)
+            || source.StartsWith("~", StringComparison.Ordinal)
+            || source.StartsWith("//wsl.localhost/", StringComparison.OrdinalIgnoreCase))
+        {
+            return VolumeMountTransport.NineP;
+        }
+
+        return VolumeMountTransport.NamedVolume;
+    }
+
+    private static bool TrySplitVolumeMount(string mount, out string source, out string destination, out string options)
+    {
+        source = string.Empty;
+        destination = string.Empty;
+        options = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(mount))
+        {
+            return false;
+        }
+
+        string trimmed = mount.Trim();
+        int firstSeparator = GetVolumeMountSeparatorIndex(trimmed);
+        if (firstSeparator <= 0 || firstSeparator >= trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        source = trimmed[..firstSeparator];
+        string remainder = trimmed[(firstSeparator + 1)..];
+        int optionSeparator = remainder.LastIndexOf(':');
+        if (optionSeparator > 0)
+        {
+            destination = remainder[..optionSeparator];
+            options = remainder[(optionSeparator + 1)..];
+        }
+        else
+        {
+            destination = remainder;
+        }
+
+        return !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(destination);
+    }
+
+    private static int GetVolumeMountSeparatorIndex(string mount)
+    {
+        if (mount.Length >= 3 && char.IsLetter(mount[0]) && mount[1] == ':' && (mount[2] == '\\' || mount[2] == '/'))
+        {
+            return mount.IndexOf(':', 3);
+        }
+
+        return mount.IndexOf(':');
+    }
+
+    private static string BuildVolumeMount(string source, string destination, string options)
+    {
+        return string.IsNullOrWhiteSpace(options)
+            ? $"{source}:{destination}"
+            : $"{source}:{destination}:{options}";
+    }
+
+    private enum VolumeMountTransport
+    {
+        NamedVolume,
+        VirtioFs,
+        NineP,
     }
 }

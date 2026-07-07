@@ -97,6 +97,7 @@ jobs:
           }
 
           $packageBaseName = "Porthole-$tag-x64"
+          $appInformationalVersion = "$version+${{ github.sha }}"
 
           # Auto-detect semver prerelease tags like v1.2.3-rc.1, v1.2.3-beta.2, v1.2.3-alpha
           if ($tag -match '^v\d+\.\d+\.\d+-[0-9A-Za-z.-]+$') {
@@ -106,13 +107,14 @@ jobs:
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "msi_version=$msiVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "app_informational_version=$appInformationalVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "package_base_name=$packageBaseName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Build MSI
         shell: pwsh
         run: |
-          dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:OutputName=${{ steps.meta.outputs.package_base_name }} -p:Platform=x64
+          dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=${{ steps.meta.outputs.package_base_name }} -p:Platform=x64
 
       - name: Prepare release assets
         id: assets

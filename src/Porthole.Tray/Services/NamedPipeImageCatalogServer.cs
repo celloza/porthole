@@ -292,6 +292,36 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Network mode updated."));
                         Log("Set network mode response sent.");
                         break;
+                    case ImageCatalogOperation.ListVolumes:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                Volumes: await ExecuteWithTimeoutAsync(
+                                    token => backendService.ListVolumesAsync(token),
+                                    ListTimeout,
+                                    cancellationToken,
+                                    "Volume list request timed out.")));
+                        Log("Volume list response sent.");
+                        break;
+                    case ImageCatalogOperation.CreateVolume:
+                        await backendService.CreateVolumeAsync(
+                            request.VolumeName ?? throw new IOException("Volume name is required."),
+                            cancellationToken);
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Volume created."));
+                        Log("Create volume response sent.");
+                        break;
+                    case ImageCatalogOperation.DeleteVolume:
+                        await backendService.DeleteVolumeAsync(
+                            request.VolumeName ?? throw new IOException("Volume name is required."),
+                            cancellationToken);
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Volume deleted."));
+                        Log("Delete volume response sent.");
+                        break;
+                    case ImageCatalogOperation.PruneVolumes:
+                        await backendService.PruneVolumesAsync(cancellationToken);
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Volumes pruned."));
+                        Log("Prune volumes response sent.");
+                        break;
                     default:
                         throw new InvalidOperationException($"Unsupported image operation: {request.Operation}");
                 }
