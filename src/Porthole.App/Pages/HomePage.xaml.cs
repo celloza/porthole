@@ -206,19 +206,28 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            Process.Start(new ProcessStartInfo
+            var process = Process.Start(new ProcessStartInfo
             {
                 FileName = "cmd.exe",
                 Arguments = "/k wsl --update --pre-release",
                 UseShellExecute = true,
             });
+
+            if (process is null)
+            {
+                throw new InvalidOperationException("The terminal process could not be started.");
+            }
         }
         catch (Exception ex)
         {
             var dialog = new ContentDialog
             {
                 Title = "Failed to launch update",
-                Content = $"Could not open a terminal to run 'wsl --update --pre-release'.\n\n{ex.Message}\n\nTry running the command manually in a terminal window.",
+                Content = new TextBlock
+                {
+                    Text = $"Could not open a terminal to run 'wsl --update --pre-release'.{Environment.NewLine}{Environment.NewLine}{ex.Message}{Environment.NewLine}{Environment.NewLine}Try running the command manually in a terminal window.",
+                    TextWrapping = Microsoft.UI.Xaml.TextWrapping.WrapWholeWords,
+                },
                 CloseButtonText = "OK",
                 XamlRoot = XamlRoot,
             };
