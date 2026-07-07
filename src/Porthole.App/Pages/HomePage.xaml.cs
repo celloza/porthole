@@ -202,7 +202,7 @@ public sealed partial class HomePage : Page
         return ConnectingBrush;
     }
 
-    private void RunWslUpdateButton_Click(object sender, RoutedEventArgs e)
+    private async void RunWslUpdateButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -215,7 +215,15 @@ public sealed partial class HomePage : Page
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[HomePage] Failed to launch wsl --update --pre-release: {ex.Message}");
+            var dialog = new ContentDialog
+            {
+                Title = "Failed to launch update",
+                Content = $"Could not open a terminal to run 'wsl --update --pre-release'.\n\n{ex.Message}\n\nTry running the command manually in a terminal window.",
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+
+            await dialog.ShowAsync();
         }
     }
 
