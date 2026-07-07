@@ -29,6 +29,10 @@ jobs:
   build-and-release:
     runs-on: windows-latest
 
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -151,3 +155,70 @@ jobs:
           files: |
             dist/*.msi
             dist/sha256.txt
+
+  winget-manifest:
+    runs-on: windows-latest
+    needs: build-and-release
+
+    permissions:
+      contents: read
+
+    env:
+      WINGETCREATE_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve WinGet inputs
+        id: winget
+        shell: pwsh
+        run: |
+          $version = "${{ needs.build-and-release.outputs.version }}"
+          $tag = "${{ needs.build-and-release.outputs.tag }}"
+          $manifestPath = Join-Path $env:RUNNER_TEMP "winget-manifests/$version"
+          $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
+
+          New-Item -ItemType Directory -Force -Path $manifestPath | Out-Null
+
+          "path=$manifestPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Validate WinGet manifest
+        shell: pwsh
+        run: |
+          Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
+
+          if (-not (Get-Command wingetcreate -ErrorAction SilentlyContinue)) {
+            $appxBundleFile = Join-Path -Path $env:TEMP -ChildPath "wingetcreate.msixbundle"
+            Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest/msixbundle" -OutFile $appxBundleFile -ErrorAction Stop
+            Add-AppxPackage -Path $appxBundleFile -ErrorAction Stop
+          }
+
+          $installerUrl = "${{ steps.winget.outputs.installer_url }}"
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
+              break
+            }
+            catch {
+              if ($attempt -eq 12) { throw }
+              Start-Sleep -Seconds 10
+            }
+          }
+
+          wingetcreate new --out "${{ steps.winget.outputs.path }}" --no-open $installerUrl
+
+          winget validate --manifest "${{ steps.winget.outputs.path }}"
+
+      - name: Submit WinGet manifest
+        if: ${{ env.WINGETCREATE_TOKEN != '' }}
+        shell: pwsh
+        run: |
+          $version = "${{ needs.build-and-release.outputs.version }}"
+          wingetcreate submit --prtitle "Add celloza.Porthole version $version" --token $env:WINGETCREATE_TOKEN --no-open "${{ steps.winget.outputs.path }}"
+
+      - name: Skip WinGet submission
+        if: ${{ env.WINGETCREATE_TOKEN == '' }}
+        shell: pwsh
+        run: |
+          Write-Host "WINGETCREATE_TOKEN is not configured. Generated manifest validation succeeded; skipping submission."
