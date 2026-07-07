@@ -70,11 +70,6 @@ internal static class Program
 
 	private static void LaunchDashboard()
 	{
-		if (TryActivateExistingDashboard())
-		{
-			return;
-		}
-
 		string? appPath = ResolveDashboardPath();
 
 		if (appPath is null)
@@ -87,6 +82,11 @@ internal static class Program
 			return;
 		}
 
+		if (TryActivateExistingDashboard(appPath))
+		{
+			return;
+		}
+
 		Process.Start(new ProcessStartInfo(appPath)
 		{
 			UseShellExecute = true,
@@ -96,6 +96,16 @@ internal static class Program
 
 	private static string? ResolveDashboardPath()
 	{
+		string? repositoryRoot = FindRepositoryRoot();
+		if (repositoryRoot is not null)
+		{
+			string? repositoryCandidate = ResolveDashboardPathFromRepository(repositoryRoot);
+			if (repositoryCandidate is not null)
+			{
+				return repositoryCandidate;
+			}
+		}
+
 		foreach (string candidate in GetDashboardPathCandidates())
 		{
 			if (File.Exists(candidate))
@@ -104,12 +114,11 @@ internal static class Program
 			}
 		}
 
-		string? repositoryRoot = FindRepositoryRoot();
-		if (repositoryRoot is null)
-		{
-			return null;
-		}
+		return null;
+	}
 
+	private static string? ResolveDashboardPathFromRepository(string repositoryRoot)
+	{
 		string appBinDirectory = Path.Combine(repositoryRoot, "src", "Porthole.App", "bin");
 		if (!Directory.Exists(appBinDirectory))
 		{
@@ -164,11 +173,27 @@ internal static class Program
 			segment.Equals("Release", StringComparison.OrdinalIgnoreCase)) ?? "Debug";
 	}
 
-	private static bool TryActivateExistingDashboard()
+	private static bool TryActivateExistingDashboard(string expectedPath)
 	{
 		foreach (Process process in Process.GetProcessesByName("Porthole.App"))
 		{
 			if (process.HasExited)
+			{
+				continue;
+			}
+
+			string? runningPath = null;
+			try
+			{
+				runningPath = process.MainModule?.FileName;
+			}
+			catch
+			{
+				// Ignore processes where executable path can't be read.
+			}
+
+			if (!string.IsNullOrWhiteSpace(runningPath) &&
+				!string.Equals(Path.GetFullPath(runningPath), Path.GetFullPath(expectedPath), StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
 			}

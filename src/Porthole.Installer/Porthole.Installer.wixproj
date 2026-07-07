@@ -6,6 +6,8 @@
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <InstallerPlatform Condition="'$(InstallerPlatform)' == ''">$(Platform)</InstallerPlatform>
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AppVersion Condition="'$(AppVersion)' == ''">$(ProductVersion)</AppVersion>
+    <AppInformationalVersion Condition="'$(AppInformationalVersion)' == ''">$(AppVersion)</AppInformationalVersion>
     <DefineConstants>
       ProductVersion=$(ProductVersion);
     </DefineConstants>
@@ -37,7 +39,7 @@
     <MakeDir Directories="$(AppOutDir);$(TrayOutDir)" />
 
     <Exec
-      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.App\Porthole.App.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained false -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -o "$(AppOutDir)"'
+      Command='dotnet publish "$(MSBuildProjectDirectory)\..\Porthole.App\Porthole.App.csproj" -c "$(ConfigurationToPublish)" -r "$(RuntimeId)" --self-contained false -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Platform=$(InstallerPlatform) -p:Version=$(AppVersion) -p:FileVersion=$(ProductVersion).0 -p:InformationalVersion=$(AppInformationalVersion) -o "$(AppOutDir)"'
       WorkingDirectory="$(MSBuildProjectDirectory)" />
 
     <Exec

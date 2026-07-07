@@ -4,12 +4,258 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:local="using:Porthole_App.Pages"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <StackPanel Padding="24,20,24,32" Spacing="16">
-        <TextBlock Opacity="0.72" Text="Settings for startup behavior, tray integration, and default runtime preferences will appear here." TextWrapping="WrapWholeWords" />
-        <TextBlock Opacity="0.72" Text="Current changes apply immediately through the main dashboard pages and the tray host." TextWrapping="WrapWholeWords" />
-    </StackPanel>
+    <Page.Resources>
+        <Style x:Key="LinkCardButtonStyle" TargetType="Button">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer>
+        <StackPanel Margin="32" Spacing="16">
+            <TextBlock
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="Settings" />
+
+            <Border
+                Padding="16"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+                <StackPanel Spacing="10">
+                    <TextBlock
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Opacity="0.6"
+                        Text="APPEARANCE" />
+
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Choose how Porthole should render in this app window."
+                        TextWrapping="WrapWholeWords" />
+
+                    <ComboBox
+                        x:Name="ThemeModeComboBox"
+                        Width="240"
+                        HorizontalAlignment="Left"
+                        SelectionChanged="ThemeModeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="System default" />
+                        <ComboBoxItem Content="Light" />
+                        <ComboBoxItem Content="Dark" />
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="About" />
+
+            <!-- Hero Card -->
+            <Border
+                Padding="24"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <Grid ColumnSpacing="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Image
+                        x:Name="AboutLogoImage"
+                        Width="120"
+                        Height="120"
+                        Source="ms-appx:///Assets/portholelogowithname.svg"
+                        Stretch="Uniform" />
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+                        <TextBlock
+                            FontSize="32"
+                            FontWeight="SemiBold"
+                            Text="Porthole" />
+
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind AppVersionText, Mode=OneTime}" />
+
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Porthole is a native Windows dashboard for WSL Containers. Monitor container state, images, sessions, networking, and storage from a Windows-first experience."
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2x2 Links Grid -->
+            <Grid RowSpacing="16" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Button
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Style="{StaticResource LinkCardButtonStyle}"
+                    Click="GitHubRepositoryButton_Click">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <FontIcon
+                            Grid.Column="0"
+                            FontSize="24"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE943;" />
+
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="GitHub Repository" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="View project source and documentation."
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+
+                        <FontIcon
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8A7;" />
+                    </Grid>
+                </Button>
+
+                <Button
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Style="{StaticResource LinkCardButtonStyle}"
+                    Click="LicenseButton_Click">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <FontIcon
+                            Grid.Column="0"
+                            FontSize="24"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE72E;" />
+
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="License" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Read GNU General Public License v3.0 details."
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+
+                        <FontIcon
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8A7;" />
+                    </Grid>
+                </Button>
+
+                <Button
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Style="{StaticResource LinkCardButtonStyle}"
+                    Click="IssuesButton_Click">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <FontIcon
+                            Grid.Column="0"
+                            FontSize="24"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE9D2;" />
+
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="Issues" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Report bugs and track feature requests."
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+
+                        <FontIcon
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8A7;" />
+                    </Grid>
+                </Button>
+
+                <Button
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Style="{StaticResource LinkCardButtonStyle}"
+                    Click="ReleasesButton_Click">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <FontIcon
+                            Grid.Column="0"
+                            FontSize="24"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE896;" />
+
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="Releases" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Browse release artifacts and changelogs."
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+
+                        <FontIcon
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8A7;" />
+                    </Grid>
+                </Button>
+            </Grid>
+
+            <TextBlock
+                HorizontalAlignment="Center"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind FooterText, Mode=OneTime}"
+                TextWrapping="WrapWholeWords" />
+        </StackPanel>
+    </ScrollViewer>
 </Page>
