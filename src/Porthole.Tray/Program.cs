@@ -192,7 +192,7 @@ internal static class Program
 				// Ignore processes where executable path can't be read.
 			}
 
-			if (!string.IsNullOrWhiteSpace(runningPath) &&
+			if (string.IsNullOrWhiteSpace(runningPath) ||
 				!string.Equals(Path.GetFullPath(runningPath), Path.GetFullPath(expectedPath), StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
