@@ -45,6 +45,7 @@ public partial class App : Application
         services.AddSingleton<IContainerCatalogService, NamedPipeContainerCatalogService>();
         services.AddSingleton<ISessionService, NamedPipeSessionService>();
         services.AddSingleton<INetworkingService, NamedPipeNetworkingService>();
+        services.AddSingleton<IVolumeService, NamedPipeVolumeService>();
         services.AddSingleton<NamedPipeDashboardSnapshotService>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<HomeViewModel>();
@@ -53,6 +54,7 @@ public partial class App : Application
         services.AddTransient<SessionViewModel>();
         services.AddTransient<NetworkingViewModel>();
         services.AddTransient<RunWizardViewModel>();
+        services.AddTransient<VolumesViewModel>();
 
         return services.BuildServiceProvider();
     }

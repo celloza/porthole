@@ -519,6 +519,170 @@ public class ViewModelTests
         Assert.Contains("ENV=prod", summary);
     }
 
+    [Fact]
+    public async Task VolumesViewModel_Refresh_LoadsVolumesAndStatus()
+    {
+        var volumes = new List<VolumeSummary>
+        {
+            new("data-vol", "local", "/var/lib/docker/volumes/data-vol/_data", null, "128 MB", true),
+            new("logs-vol", "local", "/var/lib/docker/volumes/logs-vol/_data", null, "4 MB", false),
+        };
+
+        var service = new FakeVolumeService(volumes);
+        var viewModel = new VolumesViewModel(service);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, viewModel.Volumes.Count);
+        Assert.Equal("2 volumes", viewModel.VolumeCountLabel);
+        Assert.Contains("2 volume", viewModel.StatusMessage);
+        Assert.Contains("1 unused", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task VolumesViewModel_CreateVolume_AddsVolumeAndRefreshes()
+    {
+        var service = new FakeVolumeService([]);
+        var viewModel = new VolumesViewModel(service);
+
+        viewModel.NewVolumeName = "my-new-vol";
+        await viewModel.CreateVolumeCommand.ExecuteAsync(null);
+
+        Assert.Single(service.Created);
+        Assert.Equal("my-new-vol", service.Created[0]);
+        Assert.Equal(string.Empty, viewModel.NewVolumeName);
+        Assert.Single(viewModel.Volumes);
+        Assert.Equal("my-new-vol", viewModel.Volumes[0].Name);
+    }
+
+    [Fact]
+    public async Task VolumesViewModel_CreateVolume_EmptyName_ShowsError()
+    {
+        var service = new FakeVolumeService([]);
+        var viewModel = new VolumesViewModel(service);
+
+        viewModel.NewVolumeName = "   ";
+        await viewModel.CreateVolumeCommand.ExecuteAsync(null);
+
+        Assert.Empty(service.Created);
+        Assert.Contains("volume name", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VolumesViewModel_DeleteVolume_RemovesVolumeAndRefreshes()
+    {
+        var volumes = new List<VolumeSummary>
+        {
+            new("remove-me", "local", "/data/_data", null, "8 MB", false),
+        };
+
+        var service = new FakeVolumeService(volumes);
+        var viewModel = new VolumesViewModel(service);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        var volume = viewModel.Volumes[0];
+        viewModel.SelectedVolume = volume;
+        await viewModel.DeleteVolumeCommand.ExecuteAsync(volume);
+
+        Assert.Single(service.Deleted);
+        Assert.Equal("remove-me", service.Deleted[0]);
+        Assert.Null(viewModel.SelectedVolume);
+    }
+
+    [Fact]
+    public async Task VolumesViewModel_PruneVolumes_CallsServiceAndRefreshes()
+    {
+        var volumes = new List<VolumeSummary>
+        {
+            new("keep-vol", "local", "/data/keep/_data", null, "1 MB", true),
+            new("prune-vol", "local", "/data/prune/_data", null, "2 MB", false),
+        };
+
+        var service = new FakeVolumeService(volumes);
+        var viewModel = new VolumesViewModel(service);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        Assert.Equal(2, viewModel.Volumes.Count);
+
+        await viewModel.PruneVolumesCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, service.PruneCount);
+        Assert.Single(viewModel.Volumes);
+        Assert.Equal("keep-vol", viewModel.Volumes[0].Name);
+    }
+
+    [Fact]
+    public void VolumeSummary_DriverDisplay_DefaultsToLocal()
+    {
+        var volume = new VolumeSummary("test", string.Empty, "/mnt/test", null, "1 MB", false);
+        Assert.Equal("local", volume.DriverDisplay);
+    }
+
+    [Fact]
+    public void VolumeSummary_InUseLabel_ReflectsStatus()
+    {
+        var inUse = new VolumeSummary("active", "local", "/mnt/active", null, "1 MB", true);
+        var unused = new VolumeSummary("idle", "local", "/mnt/idle", null, "1 MB", false);
+
+        Assert.Equal("In use", inUse.InUseLabel);
+        Assert.Equal("Unused", unused.InUseLabel);
+    }
+
+    [Fact]
+    public async Task VolumesViewModel_DeleteVolume_BlockedForBindMount()
+    {
+        var volumes = new List<VolumeSummary>
+        {
+            new("src", "virtiofs", "/workspace", "C:\\src", "host path", true, true),
+        };
+
+        var service = new FakeVolumeService(volumes);
+        var viewModel = new VolumesViewModel(service);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await viewModel.DeleteVolumeCommand.ExecuteAsync(viewModel.Volumes[0]);
+
+        Assert.Empty(service.Deleted);
+        Assert.Contains("Bind mounts", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_NewVolumeMountTelemetry_FlagsVirtioFsAndNineP()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.NewVolumeMount = "C:\\data:/app/data:ro";
+        Assert.Contains("virtiofs", viewModel.NewVolumeMountTelemetry, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.NewVolumeMount = "/mnt/c/data:/app/data";
+        Assert.Contains("9P", viewModel.NewVolumeMountTelemetry, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunWizardViewModel_ReviewSummary_AnnotatesVolumeTransport()
+    {
+        var imageService = new FakeImageCatalogService([]);
+        var containerService = new FakeContainerCatalogService();
+        var viewModel = new RunWizardViewModel(imageService, containerService);
+
+        viewModel.StartNewConfiguration();
+        viewModel.ContainerName = "api";
+        viewModel.SelectedImage = new ImageSummary("sha256:test", "nginx", "latest", "just now", "1 MB", "nginx:latest");
+
+        viewModel.NewVolumeMount = "C:\\data:/app/data";
+        viewModel.AddVolumeMountCommand.Execute(null);
+        viewModel.NewVolumeMount = "myvol:/cache";
+        viewModel.AddVolumeMountCommand.Execute(null);
+
+        string summary = viewModel.ReviewSummary;
+
+        Assert.Contains("virtiofs", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("named volume", summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FakeImageCatalogService(IReadOnlyList<ImageSummary> images) : IImageCatalogService
     {
         public Task<IReadOnlyList<ImageSummary>> ListImagesAsync(CancellationToken cancellationToken = default)
@@ -665,6 +829,38 @@ public class ViewModelTests
 
         public Task SetNetworkModeAsync(NetworkMode mode, CancellationToken cancellationToken = default)
         {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeVolumeService(IReadOnlyList<VolumeSummary> volumes) : IVolumeService
+    {
+        private readonly List<VolumeSummary> _volumes = volumes.ToList();
+        public List<string> Created { get; } = [];
+        public List<string> Deleted { get; } = [];
+        public int PruneCount { get; private set; }
+
+        public Task<IReadOnlyList<VolumeSummary>> ListVolumesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<VolumeSummary>>(_volumes.ToList());
+
+        public Task CreateVolumeAsync(string name, CancellationToken cancellationToken = default)
+        {
+            Created.Add(name);
+            _volumes.Add(new VolumeSummary(name, "local", $"/var/lib/docker/volumes/{name}/_data", null, "unknown", false));
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteVolumeAsync(string name, CancellationToken cancellationToken = default)
+        {
+            Deleted.Add(name);
+            _volumes.RemoveAll(v => v.Name == name);
+            return Task.CompletedTask;
+        }
+
+        public Task PruneVolumesAsync(CancellationToken cancellationToken = default)
+        {
+            PruneCount++;
+            _volumes.RemoveAll(v => !v.IsInUse);
             return Task.CompletedTask;
         }
     }

@@ -159,6 +159,36 @@ public sealed partial class RunWizardPage : Page
         }
     }
 
+    private async void PickHostFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+
+            if (!TryInitializePickerWithMainWindow(picker))
+            {
+                ViewModel.StatusMessage = "Unable to open folder picker right now.";
+                return;
+            }
+
+            StorageFolder? folder = await picker.PickSingleFolderAsync();
+            if (folder is null)
+            {
+                ViewModel.StatusMessage = "Host folder selection canceled.";
+                return;
+            }
+
+            ViewModel.PrefillHostVolumeMount(folder.Path);
+            ViewModel.StatusMessage = $"Selected host folder '{folder.Name}'. Update the container path if needed, then add the mount.";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"Failed to choose host folder: {ex.Message}";
+        }
+    }
+
     private void ResetWizardButton_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.Reset();
@@ -207,6 +237,12 @@ public sealed partial class RunWizardPage : Page
         if (picker is FileSavePicker savePicker)
         {
             WinRT.Interop.InitializeWithWindow.Initialize(savePicker, hwnd);
+            return true;
+        }
+
+        if (picker is FolderPicker folderPicker)
+        {
+            WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, hwnd);
             return true;
         }
 

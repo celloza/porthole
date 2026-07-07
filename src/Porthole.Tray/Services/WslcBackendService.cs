@@ -150,7 +150,7 @@ internal sealed class WslcBackendService : IDisposable
 
                 try
                 {
-                    string json = await RunWslcCommandAsync($"inspect {container.Name}", cancellationToken);
+                    string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
                     using JsonDocument doc = JsonDocument.Parse(json);
 
                     // wslc inspect returns an array with one element
@@ -496,6 +496,232 @@ internal sealed class WslcBackendService : IDisposable
         string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);
         return output.Trim();
     }
+
+    public async Task<IReadOnlyList<VolumeSummary>> ListVolumesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string json = await RunWslcCommandAsync("volume ls --format json", cancellationToken);
+        var items = JsonSerializer.Deserialize<List<VolumeListItem>>(json, JsonOptions) ?? [];
+        MountSnapshot mountSnapshot = await GetMountTelemetryAsync(cancellationToken);
+
+        var volumes = new Dictionary<string, VolumeSummary>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (VolumeListItem volume in items)
+        {
+            string name = volume.Name ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            mountSnapshot.NamedVolumes.TryGetValue(name, out MountTelemetry? mount);
+            volumes[name] = new VolumeSummary(
+                name,
+                string.IsNullOrWhiteSpace(volume.Driver) ? mount?.Driver ?? "local" : volume.Driver,
+                mount?.Destination ?? string.Empty,
+                null,
+                volume.UsageData?.Size is long s && s > 0 ? ToSizeLabel((ulong)s) : "unknown",
+                mount?.IsInUse ?? false,
+                false,
+                mount?.IsReadOnly ?? false,
+                "session local",
+                volume.Mountpoint);
+        }
+
+        foreach (MountTelemetry bindMount in mountSnapshot.BindMounts)
+        {
+            string key = $"bind::{bindMount.Source}::{bindMount.Destination}";
+            volumes[key] = new VolumeSummary(
+                bindMount.Name,
+                string.IsNullOrWhiteSpace(bindMount.Driver) ? "virtiofs" : bindMount.Driver,
+                bindMount.Destination,
+                bindMount.Source,
+                "host path",
+                bindMount.IsInUse,
+                true,
+                bindMount.IsReadOnly,
+                bindMount.ThroughputClass);
+        }
+
+        return volumes.Values
+            .OrderByDescending(volume => volume.IsInUse)
+            .ThenBy(volume => volume.IsBindMount)
+            .ThenBy(volume => volume.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public async Task CreateVolumeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("Volume name is required.");
+        }
+
+        await RunWslcCommandAsync($"volume create {EscapeCliArgument(name.Trim())}", cancellationToken);
+    }
+
+    public async Task DeleteVolumeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidOperationException("Volume name is required.");
+        }
+
+        string trimmedName = name.Trim();
+        MountSnapshot mountSnapshot = await GetMountTelemetryAsync(cancellationToken);
+        if (mountSnapshot.NamedVolumes.TryGetValue(trimmedName, out MountTelemetry? mount) && mount.IsInUse)
+        {
+            throw new InvalidOperationException($"Volume '{trimmedName}' is still attached to a running container.");
+        }
+
+        await RunWslcCommandAsync($"volume rm {EscapeCliArgument(trimmedName)}", cancellationToken);
+    }
+
+    public async Task PruneVolumesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await RunWslcCommandAsync("volume prune --force", cancellationToken);
+    }
+
+    private static async Task<MountSnapshot> GetMountTelemetryAsync(CancellationToken cancellationToken)
+    {
+        var namedVolumes = new Dictionary<string, MountTelemetry>(StringComparer.OrdinalIgnoreCase);
+        var bindMounts = new List<MountTelemetry>();
+
+        IReadOnlyList<ContainerListItem> containers = await GetContainersAsync(cancellationToken);
+        foreach (ContainerListItem container in containers)
+        {
+            try
+            {
+                string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
+                using JsonDocument doc = JsonDocument.Parse(json);
+
+                if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
+                {
+                    continue;
+                }
+
+                JsonElement containerElem = doc.RootElement[0];
+                if (!containerElem.TryGetProperty("Mounts", out JsonElement mounts)
+                    || mounts.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (JsonElement mount in mounts.EnumerateArray())
+                {
+                    MountTelemetry? telemetry = TryParseMountTelemetry(mount, container.State == ContainerStateRunning);
+                    if (telemetry is null)
+                    {
+                        continue;
+                    }
+
+                    if (telemetry.IsBindMount)
+                    {
+                        bindMounts.Add(telemetry);
+                        continue;
+                    }
+
+                    if (namedVolumes.TryGetValue(telemetry.Name, out MountTelemetry? existing))
+                    {
+                        namedVolumes[telemetry.Name] = existing with
+                        {
+                            Destination = string.IsNullOrWhiteSpace(existing.Destination) ? telemetry.Destination : existing.Destination,
+                            IsInUse = existing.IsInUse || telemetry.IsInUse,
+                            IsReadOnly = existing.IsReadOnly && telemetry.IsReadOnly,
+                        };
+                    }
+                    else
+                    {
+                        namedVolumes[telemetry.Name] = telemetry;
+                    }
+                }
+            }
+            catch
+            {
+                // Skip containers that fail to inspect and keep other mount telemetry visible.
+            }
+        }
+
+        return new MountSnapshot(namedVolumes, bindMounts);
+    }
+
+    private static MountTelemetry? TryParseMountTelemetry(JsonElement mount, bool isInUse)
+    {
+        string type = mount.TryGetProperty("Type", out JsonElement typeElem)
+            ? typeElem.GetString() ?? string.Empty
+            : string.Empty;
+        string name = mount.TryGetProperty("Name", out JsonElement nameElem)
+            ? nameElem.GetString() ?? string.Empty
+            : string.Empty;
+        string source = mount.TryGetProperty("Source", out JsonElement sourceElem)
+            ? sourceElem.GetString() ?? string.Empty
+            : string.Empty;
+        string destination = mount.TryGetProperty("Destination", out JsonElement destinationElem)
+            ? destinationElem.GetString() ?? string.Empty
+            : string.Empty;
+        string driver = mount.TryGetProperty("Driver", out JsonElement driverElem)
+            ? driverElem.GetString() ?? string.Empty
+            : string.Empty;
+        string mode = mount.TryGetProperty("Mode", out JsonElement modeElem)
+            ? modeElem.GetString() ?? string.Empty
+            : string.Empty;
+        bool isReadOnly = mount.TryGetProperty("RW", out JsonElement rwElem)
+            ? !rwElem.GetBoolean()
+            : mode.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(option => string.Equals(option, "ro", StringComparison.OrdinalIgnoreCase));
+
+        if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase))
+        {
+            string bindName = Path.GetFileName(source.TrimEnd('\\', '/'));
+            if (string.IsNullOrWhiteSpace(bindName))
+            {
+                bindName = source;
+            }
+
+            return new MountTelemetry(
+                bindName,
+                "virtiofs",
+                source,
+                destination,
+                true,
+                isReadOnly,
+                isInUse,
+                "shared memory");
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        return new MountTelemetry(
+            name,
+            string.IsNullOrWhiteSpace(driver) ? "local" : driver,
+            source,
+            destination,
+            false,
+            isReadOnly,
+            isInUse,
+            "session local");
+    }
+
+    private sealed record MountSnapshot(
+        IReadOnlyDictionary<string, MountTelemetry> NamedVolumes,
+        IReadOnlyList<MountTelemetry> BindMounts);
+
+    private sealed record MountTelemetry(
+        string Name,
+        string Driver,
+        string Source,
+        string Destination,
+        bool IsBindMount,
+        bool IsReadOnly,
+        bool IsInUse,
+        string ThroughputClass);
 
     public void Dispose()
     {
@@ -883,4 +1109,8 @@ internal sealed class WslcBackendService : IDisposable
     private sealed record KubectlPodStatus(string? Phase);
 
     private sealed record KubectlPodSpec(string? NodeName);
+
+    private sealed record VolumeUsageData(long? Size, int? RefCount);
+
+    private sealed record VolumeListItem(string? Name, string? Driver, string? Mountpoint, VolumeUsageData? UsageData);
 }
