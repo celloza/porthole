@@ -209,6 +209,16 @@ public sealed partial class HomePage : Page
             var cmdPath = System.IO.Path.Combine(Environment.SystemDirectory, "cmd.exe");
             var wslPath = System.IO.Path.Combine(Environment.SystemDirectory, "wsl.exe");
 
+            // Validate both tools exist before attempting to launch
+            if (!System.IO.File.Exists(cmdPath))
+            {
+                throw new FileNotFoundException($"cmd.exe not found at {cmdPath}");
+            }
+            if (!System.IO.File.Exists(wslPath))
+            {
+                throw new FileNotFoundException($"wsl.exe not found at {wslPath}. Windows Subsystem for Linux may not be installed.");
+            }
+
             using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = cmdPath,
