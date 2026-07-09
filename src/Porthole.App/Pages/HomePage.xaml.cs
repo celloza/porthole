@@ -206,10 +206,13 @@ public sealed partial class HomePage : Page
     {
         try
         {
-            var process = Process.Start(new ProcessStartInfo
+            var cmdPath = System.IO.Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            var wslPath = System.IO.Path.Combine(Environment.SystemDirectory, "wsl.exe");
+
+            using var process = Process.Start(new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = "/k wsl --update --pre-release",
+                FileName = cmdPath,
+                Arguments = $"/k \"{wslPath}\" --update --pre-release",
                 UseShellExecute = true,
             });
 
