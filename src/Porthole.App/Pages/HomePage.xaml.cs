@@ -217,6 +217,20 @@ public sealed partial class HomePage : Page
             {
                 throw new InvalidOperationException("The terminal process could not be started.");
             }
+
+            var infoDialog = new ContentDialog
+            {
+                Title = "Update launched",
+                Content = new TextBlock
+                {
+                    Text = $"'wsl --update --pre-release' is running in the terminal window.{Environment.NewLine}{Environment.NewLine}Once it completes, relaunch Porthole to apply the changes.",
+                    TextWrapping = Microsoft.UI.Xaml.TextWrapping.WrapWholeWords,
+                },
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+
+            await infoDialog.ShowAsync();
         }
         catch (Exception ex)
         {
