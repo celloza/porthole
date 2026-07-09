@@ -15,15 +15,15 @@ This document explains how Porthole publishes MSI installer releases using GitHu
    - `sha256.txt`
 4. Uploads artifacts to the workflow run.
 5. Creates or updates a GitHub Release and attaches the MSI + hash file.
-6. Uses `wingetcreate new --out ...` against the published MSI URL to generate a fresh WinGet manifest set in CI.
+6. Uses `wingetcreate update --out ...` against the published MSI URL to generate an updated WinGet manifest set in CI.
 7. Validates the generated manifest directory with `winget validate --manifest`.
-8. Submits that generated manifest directory to `microsoft/winget-pkgs` when `WINGETCREATE_TOKEN` is configured.
+8. Submits that generated manifest directory to `microsoft/winget-pkgs`.
 
 Notes:
 - The package file name is derived from the release tag (example: `v0.2.0-rc.1` -> `Porthole-v0.2.0-rc.1-x64.msi`).
 - MSI `ProductVersion` is derived from the numeric core of the tag (`0.2.0` for `v0.2.0-rc.1`) because Windows Installer requires numeric product versions.
 - The WinGet workflow generates manifests in the runner temp directory from the GitHub Release MSI URL.
-- Submission is skipped when the `WINGETCREATE_TOKEN` repository secret is not present.
+- The first accepted submission is tracked in [issue #24](https://github.com/celloza/porthole/issues/24); subsequent releases use `wingetcreate update` only.
 - During installer build, the app publish step also receives explicit version metadata:
    - `Version` = numeric MSI product version (`major.minor.patch`)
    - `FileVersion` = `<ProductVersion>.0`
@@ -142,4 +142,4 @@ msiexec /i "Porthole-v0.2.0-x64.msi" /qn AUTO_START_WITH_WINDOWS=0
 - Keep the release tag/version aligned with `PackageVersion` in your winget manifests.
 - Use the uploaded MSI URL from GitHub Releases in winget manifest installer entries.
 - Publish stable tags for production channels and prerelease tags for preview channels.
-- For this bootstrap flow, the release pipeline generates manifests dynamically with `wingetcreate` and validates them before submission.
+- For this post-bootstrap flow, the release pipeline updates the accepted package with `wingetcreate update`, validates the generated manifest, and always submits it.
