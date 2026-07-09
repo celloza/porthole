@@ -5,12 +5,22 @@
     <img alt="logo" src="assets/logo-light.svg" width="200">
   </picture>
 </div>
+<div align="center">
+  <a href="https://github.com/celloza/porthole/actions/workflows/release-installer.yml">
+    <img src="https://github.com/celloza/porthole/actions/workflows/release-installer.yml/badge.svg" alt="Release Installer status">
+  </a>
+  <a href="https://github.com/celloza/porthole/actions/workflows/tests.yml">
+    <img src="https://github.com/celloza/porthole/actions/workflows/tests.yml/badge.svg" alt="Tests status">
+  </a>
+</div>
 <div>
   <br />
   <br />
 </div>
 
 Porthole is a native Windows desktop dashboard for WSL Containers.
+
+The badges above show the current status of the main test workflow and the release installer workflow.
 
 It uses a WinUI 3 application for the UI and a tray-hosted backend for container and image operations. The app and tray communicate over named pipes using typed JSON contracts in `Porthole.Core`.
 

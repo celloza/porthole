@@ -177,13 +177,15 @@ jobs:
           $tag = "${{ needs.build-and-release.outputs.tag }}"
           $manifestPath = Join-Path $env:RUNNER_TEMP "winget-manifests/$version"
           $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
+          $packageIdentifier = "celloza.Porthole"
 
           New-Item -ItemType Directory -Force -Path $manifestPath | Out-Null
 
           "path=$manifestPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Validate WinGet manifest
+      - name: Generate WinGet update manifest
         shell: pwsh
         run: |
           Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
@@ -195,6 +197,7 @@ jobs:
           }
 
           $installerUrl = "${{ steps.winget.outputs.installer_url }}"
+          $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             try {
               Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
@@ -206,19 +209,12 @@ jobs:
             }
           }
 
-          wingetcreate new --out "${{ steps.winget.outputs.path }}" --no-open $installerUrl
+          wingetcreate update --out "${{ steps.winget.outputs.path }}" --version "${{ needs.build-and-release.outputs.version }}" --urls "$installerUrl|x64" $packageIdentifier
 
           winget validate --manifest "${{ steps.winget.outputs.path }}"
 
-      - name: Submit WinGet manifest
-        if: ${{ env.WINGETCREATE_TOKEN != '' }}
+      - name: Submit WinGet package update
         shell: pwsh
         run: |
           $version = "${{ needs.build-and-release.outputs.version }}"
           wingetcreate submit --prtitle "Add celloza.Porthole version $version" --token $env:WINGETCREATE_TOKEN --no-open "${{ steps.winget.outputs.path }}"
-
-      - name: Skip WinGet submission
-        if: ${{ env.WINGETCREATE_TOKEN == '' }}
-        shell: pwsh
-        run: |
-          Write-Host "WINGETCREATE_TOKEN is not configured. Generated manifest validation succeeded; skipping submission."
