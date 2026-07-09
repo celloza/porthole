@@ -30,6 +30,11 @@ Notes:
    - `InformationalVersion` = `<release-version>+<commit-sha>`
 - This metadata is surfaced in-app on the Settings/About page so release builds show the intended release version string.
 
+**Note on MSI ProductVersion format:** The WiX toolset requires the MSI `ProductVersion` to be numeric only
+(e.g., `1.2.3`). Pre-release labels like `-alpha`, `-rc.1` are stripped during version extraction; see the
+workflow's `outputs.msi_version` for the final numeric version used. This ensures compatibility with Windows
+Installer requirements while still supporting semantic versioning in the release tag and app metadata.
+
 ## Installer options shown during setup
 
 The MSI now prompts users for two post-install behaviors:
@@ -136,6 +141,53 @@ Per-user install with startup disabled:
 ```powershell
 msiexec /i "Porthole-v0.2.0-x64.msi" /qn AUTO_START_WITH_WINDOWS=0
 ```
+
+## Testing the installer in Windows Sandbox
+
+Before tagging a release, verify the MSI installs and runs correctly in a clean,
+disposable environment using the `scripts/Test-Sandbox.ps1` helper.
+
+### Prerequisites
+
+Windows Sandbox must be enabled (not available on Windows Home edition):
+
+```powershell
+Enable-WindowsOptionalFeature -FeatureName 'Containers-DisposableClientVM' -All -Online
+```
+
+Restart after the command completes.
+
+### Build and launch
+
+Build a fresh installer and open it in a sandbox:
+
+```powershell
+.\scripts\Test-Sandbox.ps1 -Version 0.0.5
+```
+
+**Note:** The `-Version` parameter must be numeric only (e.g., `0.0.5`, not `0.0.5-alpha`).
+WiX/Windows Installer requires the `ProductVersion` in `major.minor.build` format with no pre-release labels.
+
+Reuse the most recently built MSI without rebuilding:
+
+```powershell
+.\scripts\Test-Sandbox.ps1 -SkipBuild
+```
+
+### What happens
+
+1. The installer output folder (`src/Porthole.Installer/bin/x64/Release/`) is mapped
+   read-only into the sandbox at `C:\Users\WDAGUtilityAccount\Desktop\Porthole`.
+2. A startup script copies the MSI to the sandbox desktop and launches it interactively.
+3. Complete the installation wizard inside the sandbox.
+4. Porthole starts via the tray; the Home page should show the prerequisites `InfoBar`
+   because WSL Containers is not present in a fresh sandbox.
+5. Click **Run wsl --update --pre-release** and confirm:
+   - A `cmd.exe` terminal opens and runs the command.
+   - A guidance dialog appears instructing you to relaunch Porthole once the
+     terminal completes.
+
+Closing the sandbox discards all changes — no cleanup is required on the host.
 
 ## Winget alignment notes
 

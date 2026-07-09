@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Porthole.Core.Services.NamedPipe;
 using Porthole.Core.ViewModels;
+using System.Diagnostics;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -199,6 +200,67 @@ public sealed partial class HomePage : Page
         }
 
         return ConnectingBrush;
+    }
+
+    private async void RunWslUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var cmdPath = System.IO.Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            var wslPath = System.IO.Path.Combine(Environment.SystemDirectory, "wsl.exe");
+
+            // Validate both tools exist before attempting to launch
+            if (!System.IO.File.Exists(cmdPath))
+            {
+                throw new FileNotFoundException($"cmd.exe not found at {cmdPath}");
+            }
+            if (!System.IO.File.Exists(wslPath))
+            {
+                throw new FileNotFoundException($"wsl.exe not found at {wslPath}. Windows Subsystem for Linux may not be installed.");
+            }
+
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = cmdPath,
+                Arguments = $"/k \"{wslPath}\" --update --pre-release",
+                UseShellExecute = true,
+            });
+
+            if (process is null)
+            {
+                throw new InvalidOperationException("The terminal process could not be started.");
+            }
+
+            var infoDialog = new ContentDialog
+            {
+                Title = "Installing WSL Containers",
+                Content = new TextBlock
+                {
+                    Text = $"WSL Containers is being installed in the terminal window.{Environment.NewLine}{Environment.NewLine}Once the installation completes, close this window and reopen the Porthole dashboard to continue.",
+                    TextWrapping = Microsoft.UI.Xaml.TextWrapping.WrapWholeWords,
+                },
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+
+            await infoDialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Failed to launch update",
+                Content = new TextBlock
+                {
+                    Text = $"Could not open a terminal to run 'wsl --update --pre-release'.{Environment.NewLine}{Environment.NewLine}{ex.Message}{Environment.NewLine}{Environment.NewLine}Try running the command manually in a terminal window.",
+                    TextWrapping = Microsoft.UI.Xaml.TextWrapping.WrapWholeWords,
+                },
+                CloseButtonText = "OK",
+                XamlRoot = XamlRoot,
+            };
+
+            await dialog.ShowAsync();
+        }
     }
 
     private static bool ContainsAny(string value, params string[] terms)
