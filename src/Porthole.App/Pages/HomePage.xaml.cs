@@ -233,10 +233,10 @@ public sealed partial class HomePage : Page
 
             var infoDialog = new ContentDialog
             {
-                Title = "Update launched",
+                Title = "Installing WSL Containers",
                 Content = new TextBlock
                 {
-                    Text = $"'wsl --update --pre-release' is running in the terminal window.{Environment.NewLine}{Environment.NewLine}Once it completes, relaunch Porthole to apply the changes.",
+                    Text = $"WSL Containers is being installed in the terminal window.{Environment.NewLine}{Environment.NewLine}Once the installation completes, close this window and reopen the Porthole dashboard to continue.",
                     TextWrapping = Microsoft.UI.Xaml.TextWrapping.WrapWholeWords,
                 },
                 CloseButtonText = "OK",
