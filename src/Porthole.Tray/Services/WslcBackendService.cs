@@ -24,6 +24,7 @@ internal sealed class WslcBackendService : IDisposable
     private readonly object _syncLock = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _sessionSettings = new(StringComparer.OrdinalIgnoreCase); // name -> storagePath
+    private readonly Dictionary<string, string> _sessionStatuses = new(StringComparer.OrdinalIgnoreCase); // name -> "Running"|"Stopped"
     private string _activeSessionName = "Porthole";
     private NetworkMode _networkMode = NetworkMode.Bridge;
 
@@ -55,6 +56,7 @@ internal sealed class WslcBackendService : IDisposable
             session.Start();
             _sessions[name] = session;
             _sessionSettings[name] = settings.StoragePath;
+            _sessionStatuses[name] = "Running";
         }
     }
 
@@ -71,9 +73,108 @@ internal sealed class WslcBackendService : IDisposable
             {
                 _sessions.Remove(name);
                 _sessionSettings.Remove(name);
+                _sessionStatuses.Remove(name);
                 try { session.Terminate(); } catch { }
                 session.Dispose();
             }
+        }
+    }
+
+    public void PauseSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (!_sessions.TryGetValue(name, out Session? session))
+            {
+                throw new InvalidOperationException($"Session '{name}' does not exist.");
+            }
+
+            // Terminate the WSL VM to free resources; settings and VHD are preserved for Resume.
+            try { session.Terminate(); } catch { }
+            session.Dispose();
+            _sessions.Remove(name);
+            _sessionStatuses[name] = "Stopped";
+
+            // If this was the active session, pick another one.
+            if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? name;
+            }
+        }
+    }
+
+    public void ResumeSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (_sessions.ContainsKey(name))
+            {
+                // Already running; update status in case it drifted.
+                _sessionStatuses[name] = "Running";
+                return;
+            }
+
+            if (!_sessionSettings.ContainsKey(name))
+            {
+                throw new InvalidOperationException($"Session '{name}' settings not found. The session may have been terminated.");
+            }
+
+            // Recreate the WSL VM using the existing VHD storage path.
+            var settings = CreateDefaultSessionSettings(name);
+            var session = new Session(settings);
+            session.Start();
+            _sessions[name] = session;
+            _sessionStatuses[name] = "Running";
+        }
+    }
+
+    public void TerminateNamedSession(string name)
+    {
+        lock (_syncLock)
+        {
+            if (_sessions.TryGetValue(name, out Session? session))
+            {
+                _sessions.Remove(name);
+                try { session.Terminate(); } catch { }
+                session.Dispose();
+            }
+
+            _sessionSettings.Remove(name);
+            _sessionStatuses.Remove(name);
+
+            if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? "Porthole";
+            }
+        }
+    }
+
+    public IReadOnlyList<SessionSnapshot> GetTraySnapshot()
+    {
+        lock (_syncLock)
+        {
+            // Include all known sessions: running ones in _sessions plus any paused ones tracked in _sessionStatuses.
+            var allNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            allNames.UnionWith(_sessions.Keys);
+            allNames.UnionWith(_sessionStatuses.Keys);
+
+            return allNames
+                .Select(name =>
+                {
+                    string status = _sessionStatuses.TryGetValue(name, out string? s)
+                        ? s
+                        : _sessions.ContainsKey(name) ? "Running" : "Unknown";
+
+                    return new SessionSnapshot(
+                        name,
+                        string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase),
+                        status,
+                        CpuUsage: string.Empty,
+                        MemoryUsage: string.Empty);
+                })
+                .OrderByDescending(s => s.IsActive)
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
     }
 
@@ -747,6 +848,7 @@ internal sealed class WslcBackendService : IDisposable
                 session = StartSession(_activeSessionName);
                 _sessions[_activeSessionName] = session;
                 _sessionSettings[_activeSessionName] = settings.StoragePath;
+                _sessionStatuses[_activeSessionName] = "Running";
             }
 
             return session;

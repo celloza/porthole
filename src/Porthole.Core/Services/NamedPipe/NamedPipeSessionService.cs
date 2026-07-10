@@ -47,4 +47,38 @@ public sealed class NamedPipeSessionService : ISessionService
 
         return response.Message ?? string.Empty;
     }
+
+    public async Task PauseSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.PauseSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task ResumeSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.ResumeSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task TerminateSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.TerminateSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SessionSnapshot>> GetTraySnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.GetTraySnapshot),
+            progress: null,
+            cancellationToken);
+
+        return response.TraySnapshots ?? [];
+    }
 }

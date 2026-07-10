@@ -279,6 +279,31 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                                 Message: backendService.GetActiveSessionName()));
                         Log("Get active session response sent.");
                         break;
+                    case ImageCatalogOperation.PauseSession:
+                        backendService.PauseSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Session paused."));
+                        Log("Pause session response sent.");
+                        break;
+                    case ImageCatalogOperation.ResumeSession:
+                        backendService.ResumeSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Session resumed."));
+                        Log("Resume session response sent.");
+                        break;
+                    case ImageCatalogOperation.TerminateSession:
+                        backendService.TerminateNamedSession(
+                            request.SessionName ?? throw new IOException("Session name is required."));
+                        await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Session terminated."));
+                        Log("Terminate session response sent.");
+                        break;
+                    case ImageCatalogOperation.GetTraySnapshot:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                TraySnapshots: backendService.GetTraySnapshot()));
+                        Log("Tray snapshot response sent.");
+                        break;
                     case ImageCatalogOperation.GetNetworkingSnapshot:
                         await WriteResponseSafeAsync(
                             new ImageCatalogResponse(

@@ -33,6 +33,12 @@ public enum ImageCatalogOperation
     GetNetworkingSnapshot = 30,
     SetNetworkMode = 31,
 
+    // Session quick controls (tray flyout)
+    PauseSession = 26,
+    ResumeSession = 27,
+    TerminateSession = 28,
+    GetTraySnapshot = 29,
+
     // Volume management
     ListVolumes = 40,
     CreateVolume = 41,
@@ -68,4 +74,5 @@ public sealed record ImageCatalogResponse(
     ImagePullProgress? Progress = null,
     IReadOnlyList<SessionSummary>? Sessions = null,
     NetworkingSnapshot? NetworkingSnapshot = null,
-    IReadOnlyList<VolumeSummary>? Volumes = null);
+    IReadOnlyList<VolumeSummary>? Volumes = null,
+    IReadOnlyList<SessionSnapshot>? TraySnapshots = null);

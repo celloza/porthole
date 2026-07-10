@@ -27,16 +27,20 @@ internal static class Program
 	private sealed class TrayApplicationContext : ApplicationContext
 	{
 		private readonly NamedPipeImageCatalogServer _imageServer;
+		private readonly WslcBackendService _backendService;
 		private readonly ContextMenuStrip _menu;
 		private readonly NotifyIcon _notifyIcon;
+		private TrayFlyoutForm? _flyout;
 
 		public TrayApplicationContext()
 		{
-			_imageServer = new NamedPipeImageCatalogServer(new WslcBackendService());
+			_backendService = new WslcBackendService();
+			_imageServer = new NamedPipeImageCatalogServer(_backendService);
 			_imageServer.Start();
 
 			_menu = new ContextMenuStrip();
 			_menu.Items.Add("Open dashboard", null, (_, _) => LaunchDashboard());
+			_menu.Items.Add(new ToolStripSeparator());
 			_menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
 			var trayIcon = LoadTrayIcon();
@@ -48,16 +52,31 @@ internal static class Program
 				ContextMenuStrip = _menu,
 			};
 
+			_notifyIcon.MouseClick += OnNotifyIconMouseClick;
 			_notifyIcon.DoubleClick += (_, _) => LaunchDashboard();
 			LaunchDashboard();
 		}
 
+		private void OnNotifyIconMouseClick(object? sender, MouseEventArgs e)
+		{
+			if (e.Button != MouseButtons.Left)
+			{
+				return;
+			}
+
+			_flyout ??= new TrayFlyoutForm(_backendService, LaunchDashboard);
+			_flyout.ShowNearTray();
+		}
+
 		protected override void ExitThreadCore()
 		{
+			_flyout?.Dispose();
+			_flyout = null;
 			_notifyIcon.Visible = false;
 			_notifyIcon.Dispose();
 			_menu.Dispose();
 			_imageServer.Dispose();
+			_backendService.Dispose();
 			base.ExitThreadCore();
 		}
 	}
