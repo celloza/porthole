@@ -75,10 +75,10 @@ internal static class Program
 		if (appPath is null)
 		{
 			MessageBox.Show(
-				"Porthole.App.exe could not be found in the tray output or the app project's build output. Build the dashboard once or build the full solution before relying on tray activation.",
-				"Porthole",
+				"The Porthole dashboard could not be opened. If this issue persists after reinstalling Porthole, please report it at https://github.com/celloza/porthole/issues.",
+				"Porthole — Dashboard unavailable",
 				MessageBoxButtons.OK,
-				MessageBoxIcon.Information);
+				MessageBoxIcon.Warning);
 			return;
 		}
 
@@ -138,12 +138,26 @@ internal static class Program
 
 	private static IEnumerable<string> GetDashboardPathCandidates()
 	{
-		string baseDirectory = AppContext.BaseDirectory;
+		// Prefer the process path over AppContext.BaseDirectory, which can differ
+		// (e.g. when the app is launched by an MSI custom action with a relative executable path).
+		string? processDir = string.IsNullOrEmpty(Environment.ProcessPath)
+			? null
+			: Path.GetDirectoryName(Environment.ProcessPath);
+		string baseDirectory = processDir ?? AppContext.BaseDirectory;
+
 		yield return Path.Combine(baseDirectory, "Porthole.App.exe");
 
 		// Installed MSI layout places tray and dashboard in sibling folders: ...\Porthole\Tray and ...\Porthole\App
 		yield return Path.GetFullPath(Path.Combine(baseDirectory, "..", "App", "Porthole.App.exe"));
 		yield return Path.GetFullPath(Path.Combine(baseDirectory, "..", "Porthole.App.exe"));
+
+		// Explicit per-user installation path — reliable when path arithmetic from the process
+		// directory is not available or does not resolve to the correct installation layout.
+		string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+		if (!string.IsNullOrEmpty(localAppData))
+		{
+			yield return Path.Combine(localAppData, "Porthole", "App", "Porthole.App.exe");
+		}
 	}
 
 	private static string? FindRepositoryRoot()
