@@ -88,7 +88,7 @@
                     FontSize="28"
                     FontWeight="SemiBold"
                     Text="{x:Bind ViewModel.CurrentSectionTitle, Mode=OneWay}" />
-                <Frame Grid.Row="1" x:Name="NavFrame" />
+                <Frame Grid.Row="1" x:Name="NavFrame" Navigated="NavFrame_Navigated" />
             </Grid>
         </NavigationView>
     </Grid>

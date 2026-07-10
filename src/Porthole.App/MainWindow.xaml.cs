@@ -99,44 +99,109 @@ public sealed partial class MainWindow : Window
         NavFrame.GoBack();
     }
 
+    private void NavFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
+    {
+        SyncNavViewToCurrentPage();
+    }
+
+    private void SyncNavViewToCurrentPage()
+    {
+        Type? currentPage = NavFrame.CurrentSourcePageType;
+
+        if (currentPage == typeof(SettingsPage))
+        {
+            NavView.SelectedItem = NavView.SettingsItem;
+            ViewModel.SetSection("Settings");
+            return;
+        }
+
+        (string tag, string section) = currentPage?.Name switch
+        {
+            nameof(HomePage) => ("home", "System Dashboard"),
+            nameof(ImagesPage) => ("images", "Images"),
+            nameof(ContainersPage) => ("containers", "Containers"),
+            nameof(SessionsPage) => ("sessions", "Sessions"),
+            nameof(NetworkingPage) => ("networking", "Networking"),
+            nameof(VolumesPage) => ("volumes", "Volumes"),
+            nameof(RunWizardPage) => ("run-wizard", "Run Wizard"),
+            _ => (string.Empty, string.Empty),
+        };
+
+        if (string.IsNullOrEmpty(tag))
+            return;
+
+        ViewModel.SetSection(section);
+
+        NavigationViewItem? match = NavView.MenuItems
+            .OfType<NavigationViewItem>()
+            .FirstOrDefault(item => item.Tag as string == tag);
+
+        if (match is not null)
+            NavView.SelectedItem = match;
+    }
+
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (args.IsSettingsSelected)
         {
-            ViewModel.SetSection("Settings");
-            NavFrame.Navigate(typeof(SettingsPage));
+            if (NavFrame.CurrentSourcePageType != typeof(SettingsPage))
+            {
+                ViewModel.SetSection("Settings");
+                NavFrame.Navigate(typeof(SettingsPage));
+            }
         }
         else if (args.SelectedItem is NavigationViewItem item)
         {
             switch (item.Tag)
             {
                 case "home":
-                    ViewModel.SetSection("System Dashboard");
-                    NavFrame.Navigate(typeof(HomePage));
+                    if (NavFrame.CurrentSourcePageType != typeof(HomePage))
+                    {
+                        ViewModel.SetSection("System Dashboard");
+                        NavFrame.Navigate(typeof(HomePage));
+                    }
                     break;
                 case "images":
-                    ViewModel.SetSection("Images");
-                    NavFrame.Navigate(typeof(ImagesPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(ImagesPage))
+                    {
+                        ViewModel.SetSection("Images");
+                        NavFrame.Navigate(typeof(ImagesPage));
+                    }
                     break;
                 case "containers":
-                    ViewModel.SetSection("Containers");
-                    NavFrame.Navigate(typeof(ContainersPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(ContainersPage))
+                    {
+                        ViewModel.SetSection("Containers");
+                        NavFrame.Navigate(typeof(ContainersPage));
+                    }
                     break;
                 case "sessions":
-                    ViewModel.SetSection("Sessions");
-                    NavFrame.Navigate(typeof(SessionsPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(SessionsPage))
+                    {
+                        ViewModel.SetSection("Sessions");
+                        NavFrame.Navigate(typeof(SessionsPage));
+                    }
                     break;
                 case "networking":
-                    ViewModel.SetSection("Networking");
-                    NavFrame.Navigate(typeof(NetworkingPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(NetworkingPage))
+                    {
+                        ViewModel.SetSection("Networking");
+                        NavFrame.Navigate(typeof(NetworkingPage));
+                    }
                     break;
                 case "volumes":
-                    ViewModel.SetSection("Volumes");
-                    NavFrame.Navigate(typeof(VolumesPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(VolumesPage))
+                    {
+                        ViewModel.SetSection("Volumes");
+                        NavFrame.Navigate(typeof(VolumesPage));
+                    }
                     break;
                 case "run-wizard":
-                    ViewModel.SetSection("Run Wizard");
-                    NavFrame.Navigate(typeof(RunWizardPage));
+                    if (NavFrame.CurrentSourcePageType != typeof(RunWizardPage))
+                    {
+                        ViewModel.SetSection("Run Wizard");
+                        NavFrame.Navigate(typeof(RunWizardPage));
+                    }
                     break;
                 default:
                     throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");
