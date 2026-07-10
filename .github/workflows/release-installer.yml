@@ -180,7 +180,7 @@ jobs:
           "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Generate and submit WinGet update
+      - name: Submit to WinGet
         shell: pwsh
         run: |
           Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
@@ -195,6 +195,7 @@ jobs:
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
           
+          # Verify installer is available
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             try {
               Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
@@ -206,5 +207,12 @@ jobs:
             }
           }
 
-          # Generate and submit the manifest in one step
-          wingetcreate update --submit --token $env:WINGETCREATE_TOKEN --urls "$installerUrl`|x64" --version "$version" --prtitle "Update celloza.Porthole to version $version" --no-open $packageIdentifier
+          # Build URL array with architecture
+          $urls = @("$installerUrl|x64")
+          
+          # Update existing package and submit to WinGet
+          wingetcreate update $packageIdentifier `
+            --version $version `
+            --token $env:WINGETCREATE_TOKEN `
+            --urls $urls `
+            --submit
