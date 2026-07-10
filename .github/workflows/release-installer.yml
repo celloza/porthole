@@ -173,19 +173,14 @@ jobs:
         id: winget
         shell: pwsh
         run: |
-          $version = "${{ needs.build-and-release.outputs.version }}"
           $tag = "${{ needs.build-and-release.outputs.tag }}"
-          $manifestPath = Join-Path $env:RUNNER_TEMP "winget-manifests/$version"
           $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
           $packageIdentifier = "celloza.Porthole"
 
-          New-Item -ItemType Directory -Force -Path $manifestPath | Out-Null
-
-          "path=$manifestPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Generate WinGet update manifest
+      - name: Generate and submit WinGet update
         shell: pwsh
         run: |
           Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
@@ -198,6 +193,8 @@ jobs:
 
           $installerUrl = "${{ steps.winget.outputs.installer_url }}"
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
+          $version = "${{ needs.build-and-release.outputs.version }}"
+          
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             try {
               Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
@@ -209,12 +206,5 @@ jobs:
             }
           }
 
-          wingetcreate update --out "${{ steps.winget.outputs.path }}" --version "${{ needs.build-and-release.outputs.version }}" --urls "$installerUrl`|x64" $packageIdentifier
-
-          winget validate --manifest "${{ steps.winget.outputs.path }}"
-
-      - name: Submit WinGet package update
-        shell: pwsh
-        run: |
-          $version = "${{ needs.build-and-release.outputs.version }}"
-          wingetcreate submit --prtitle "Add celloza.Porthole version $version" --token $env:WINGETCREATE_TOKEN --no-open "${{ steps.winget.outputs.path }}"
+          # Generate and submit the manifest in one step
+          wingetcreate update --submit --token $env:WINGETCREATE_TOKEN --urls "$installerUrl`|x64" --version "$version" --prtitle "Update celloza.Porthole to version $version" --no-open $packageIdentifier
