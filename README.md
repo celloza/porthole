@@ -20,8 +20,6 @@
 
 Porthole is a native Windows desktop dashboard for WSL Containers.
 
-The badges above show the current status of the main test workflow and the release installer workflow.
-
 It uses a WinUI 3 application for the UI and a tray-hosted backend for container and image operations. The app and tray communicate over named pipes using typed JSON contracts in `Porthole.Core`.
 
 ## Features
@@ -218,6 +216,26 @@ Settings now includes both runtime app preferences and project metadata in one p
 - Version line in the format `vX.Y.Z` or `vX.Y.Z (<metadata>)` when build metadata is available
 - Quick links for repository, license, issues, and releases
 
+## Installation
+
+### Windows Package Manager (winget)
+
+Porthole is available on Windows Package Manager. Install with:
+
+```powershell
+winget install celloza.Porthole
+```
+
+To upgrade an existing installation:
+
+```powershell
+winget upgrade celloza.Porthole
+```
+
+### Manual Installation (MSI)
+
+Alternatively, download the `.msi` installer from [GitHub Releases](https://github.com/celloza/porthole/releases) and run it directly.
+
 ## Projects
 
 - `src/Porthole.App`: WinUI 3 desktop dashboard
@@ -232,9 +250,23 @@ Settings now includes both runtime app preferences and project metadata in one p
 
 ## Prerequisites
 
-- Windows 10/11
+### Runtime
+
+- Windows 10/11 (Pro, Enterprise, or Education editions)
+- WSL 2 with WSL Containers prerelease components
+
+To verify you have WSL Containers installed, run:
+
+```powershell
+wsl --update --pre-release
+```
+
+If you see `wslc` available in your PATH, you're ready to use Porthole.
+
+### Development (Building from Source)
+
 - .NET SDK 8.0+
-- WSL with WSL Containers (`wslc`)
+- Visual Studio or VS Code with C# extension
 
 ## Architecture
 
