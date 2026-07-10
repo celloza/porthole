@@ -510,25 +510,38 @@ internal sealed class TrayFlyoutForm : Form
 
     private void RunAction(Action action)
     {
-        try
+        // Run on a thread-pool thread to avoid blocking the UI for sync WSL SDK calls.
+        _ = Task.Run(() =>
         {
-            action();
-            Refresh_();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                ex.Message,
-                "Porthole — Action failed",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-        }
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed)
+                {
+                    Invoke(() => MessageBox.Show(
+                        ex.Message,
+                        "Porthole — Action failed",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning));
+                }
+
+                return;
+            }
+
+            if (!IsDisposed)
+            {
+                Invoke(Refresh_);
+            }
+        });
     }
 
     private static bool ConfirmTerminate(string sessionName)
     {
         return MessageBox.Show(
-            $"Terminate session '{sessionName}'? This will stop all its containers.\n\nThis action cannot be undone.",
+            $"Terminate session '{sessionName}'? This will stop all its containers and remove the session from Porthole.\n\nUnderlying VHD storage is preserved on disk and can be re-attached manually.",
             "Porthole — Confirm terminate",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning,

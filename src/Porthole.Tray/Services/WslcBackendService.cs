@@ -95,7 +95,9 @@ internal sealed class WslcBackendService : IDisposable
             _sessions.Remove(name);
             _sessionStatuses[name] = "Stopped";
 
-            // If this was the active session, pick another one.
+            // If this was the active session, prefer switching to another running session.
+            // If none are available, keep _activeSessionName pointing to the paused session name
+            // so GetActiveSessionInstance() auto-recreates it on the next operation that needs it.
             if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
             {
                 _activeSessionName = _sessions.Keys.FirstOrDefault() ?? name;

@@ -29,15 +29,15 @@ public enum ImageCatalogOperation
     // Container creation
     CreateContainer = 25,
 
-    // Networking
-    GetNetworkingSnapshot = 30,
-    SetNetworkMode = 31,
-
     // Session quick controls (tray flyout)
     PauseSession = 26,
     ResumeSession = 27,
     TerminateSession = 28,
     GetTraySnapshot = 29,
+
+    // Networking
+    GetNetworkingSnapshot = 30,
+    SetNetworkMode = 31,
 
     // Volume management
     ListVolumes = 40,
