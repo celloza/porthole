@@ -20,9 +20,40 @@
 
 Porthole is a native Windows desktop dashboard for WSL Containers.
 
-The badges above show the current status of the main test workflow and the release installer workflow.
-
 It uses a WinUI 3 application for the UI and a tray-hosted backend for container and image operations. The app and tray communicate over named pipes using typed JSON contracts in `Porthole.Core`.
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Features](#features)
+- [Feature Details](#feature-details)
+- [Projects](#projects)
+- [Documentation](#documentation)
+- [Prerequisites](#prerequisites)
+- [Architecture](#architecture)
+- [Build](#build)
+- [Run](#run)
+- [Development Notes](#development-notes)
+
+## Installation
+
+### Windows Package Manager (winget)
+
+Porthole is available on Windows Package Manager. Install with:
+
+```powershell
+winget install celloza.Porthole
+```
+
+To upgrade an existing installation:
+
+```powershell
+winget upgrade celloza.Porthole
+```
+
+### Manual Installation (MSI)
+
+Alternatively, download the `.msi` installer from [GitHub Releases](https://github.com/celloza/porthole/releases) and run it directly.
 
 ## Features
 
