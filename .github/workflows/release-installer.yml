@@ -173,15 +173,10 @@ jobs:
         id: winget
         shell: pwsh
         run: |
-          $version = "${{ needs.build-and-release.outputs.version }}"
           $tag = "${{ needs.build-and-release.outputs.tag }}"
-          $manifestPath = Join-Path $env:RUNNER_TEMP "winget-manifests/$version"
           $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
           $packageIdentifier = "celloza.Porthole"
 
-          New-Item -ItemType Directory -Force -Path $manifestPath | Out-Null
-
-          "path=$manifestPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
