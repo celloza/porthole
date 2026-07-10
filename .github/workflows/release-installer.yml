@@ -209,7 +209,7 @@ jobs:
             }
           }
 
-          wingetcreate update --out "${{ steps.winget.outputs.path }}" --version "${{ needs.build-and-release.outputs.version }}" --urls "$installerUrl|x64" $packageIdentifier
+          wingetcreate update --out "${{ steps.winget.outputs.path }}" --version "${{ needs.build-and-release.outputs.version }}" --urls "$installerUrl`|x64" $packageIdentifier
 
           winget validate --manifest "${{ steps.winget.outputs.path }}"
 
