@@ -4,6 +4,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using Microsoft.WSL.Containers;
 using Porthole.Core.Models;
+using Porthole.Core.Services;
 
 namespace Porthole.Tray.Services;
 
@@ -549,6 +550,12 @@ internal sealed class WslcBackendService : IDisposable
             .ThenBy(volume => volume.IsBindMount)
             .ThenBy(volume => volume.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    public Task<DevContainerCapabilityReport> AnalyzeDevContainerConfigAsync(string devContainerConfigJson, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(DevContainerConfigAnalyzer.Analyze(devContainerConfigJson));
     }
 
     public async Task CreateVolumeAsync(string name, CancellationToken cancellationToken = default)
