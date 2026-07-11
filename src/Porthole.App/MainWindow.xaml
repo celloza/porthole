@@ -82,6 +82,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock
                     Margin="24,20,24,0"
@@ -89,6 +90,74 @@
                     FontWeight="SemiBold"
                     Text="{x:Bind ViewModel.CurrentSectionTitle, Mode=OneWay}" />
                 <Frame Grid.Row="1" x:Name="NavFrame" Navigated="NavFrame_Navigated" />
+
+                <Border
+                    x:Name="SessionToolbarBorder"
+                    Grid.Row="2"
+                    Padding="16,8"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
+                    BorderThickness="0,1,0,0">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="10"
+                            VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <FontIcon
+                                    FontSize="12"
+                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                    Glyph="&#xE7EF;" />
+                                <FontIcon
+                                    FontSize="10"
+                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                    Glyph="&#xE710;" />
+                            </StackPanel>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind ViewModel.ActiveSessionDisplay, Mode=OneWay}" />
+                            <ComboBox
+                                x:Name="SessionPicker"
+                                MinWidth="220"
+                                DisplayMemberPath="Name"
+                                IsEnabled="{x:Bind ViewModel.HasSessions, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}"
+                                PlaceholderText="No sessions"
+                                SelectedItem="{x:Bind ViewModel.SelectedSession, Mode=TwoWay}" />
+                            <Button Command="{x:Bind ViewModel.RefreshSessionsCommand}" ToolTipService.ToolTip="Refresh sessions">
+                                <FontIcon FontSize="12" Glyph="&#xE72C;" />
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="12"
+                            VerticalAlignment="Center">
+                            <ProgressRing
+                                Width="14"
+                                Height="14"
+                                IsActive="{x:Bind ViewModel.IsSessionLoading, Mode=OneWay}" />
+                            <TextBlock
+                                MaxWidth="380"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Opacity="0.78"
+                                Text="{x:Bind ViewModel.SessionStatus, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis" />
+                            <Button Click="OpenSessionsToolbarButton_Click" ToolTipService.ToolTip="Manage sessions">
+                                <FontIcon FontSize="12" Glyph="&#xE8A7;" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </Grid>
         </NavigationView>
     </Grid>

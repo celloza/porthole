@@ -62,6 +62,7 @@ Alternatively, download the `.msi` installer from [GitHub Releases](https://gith
 - ✅ **Images**: pull, tag, and delete container images
 - ✅ **Containers**: start, stop, and remove containers
 - ✅ **Sessions**: create and manage isolated session environments for workload grouping
+- ✅ **VS Code Integration**: Docker-compatible API bridging for the Containers extension plus a Dev Containers CLI shim
 - ✅ **Networking**: configure network mode (bridge vs. consomme) and inspect active port bindings and host proxy configuration
 - ✅ **Volume Management**: inspect named volumes and bind mounts, surface virtiofs telemetry, and create/delete/prune named volumes
 - ✅ **Run Wizard**: interactive container creation with template save/load, port mapping, environment variables, and volume configuration
@@ -115,6 +116,17 @@ Lifecycle management for running containers:
     <img alt="dashboard" src="assets/containers.png" width="600">
   </picture>
 </div>
+
+### VS Code Integration
+
+Porthole integrates with both major VS Code container workflows:
+
+- **Containers Extension**: connects through the tray-hosted Docker-compatible API bridge
+- **Dev Containers Extension**: uses the `porthole-cli` Docker CLI shim for compatibility-critical commands
+- **Session-aware Routing**: session-scoped `wslc --session <name>` calls keep VS Code operations pinned to the intended workload context
+- **Configurable Setup**: supports explicit `DOCKER_HOST` and `dev.containers.dockerPath` settings for predictable extension behavior
+
+See [docs/vscode-integration.md](docs/vscode-integration.md) for supported API calls, VS Code `settings.json` examples, troubleshooting steps, and outstanding compatibility work.
 
 ### Networking
 
@@ -185,6 +197,20 @@ Isolated container environments for multi-tenant and workload grouping scenarios
 - View all available sessions with metadata (name, storage path, active status)
 - Visual indicator for the currently active session
 - Storage path shows where session state and containers are persisted
+
+**Session Switching Toolbar** 🆕
+- A session toolbar is shown at the bottom of the main content column on app pages
+- Uses the sessions icon to keep the active session context visible without opening the Sessions page
+- Quick actions allow refreshing session state or opening the full Sessions management page
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/sessiontoolbar.png">
+    <img alt="session switching toolbar" src="assets/sessiontoolbar.png" width="600">
+  </picture>
+</div>
+
+
 
 ### Run Wizard
 
@@ -280,6 +306,7 @@ Alternatively, download the `.msi` installer from [GitHub Releases](https://gith
 
 - [docs/volume-management.md](docs/volume-management.md): named volumes, bind mounts, virtiofs telemetry, and run-wizard mount guidance
 - [docs/release-workflow.md](docs/release-workflow.md): installer and GitHub release flow
+- [docs/vscode-integration.md](docs/vscode-integration.md): Docker API bridge, Dev Containers shim, VS Code settings, and session-scoped `wslc` behavior
 
 ## Prerequisites
 
@@ -429,3 +456,14 @@ Sessions are stored in the WSL Containers SDK with:
 - `Session session = new Session(sessionSettings)` — creates session instance
 - `session.Start()` — initializes the session filesystem and runtime
 - Active session is tracked in `_activeSessionName` (in-memory; resets on tray restart)
+
+### Session-Scoped `wslc`
+
+Porthole relies on a hidden global `wslc` switch to keep CLI and tray operations pinned to the correct session:
+
+- `wslc --session <name> list --all --format json`
+- `wslc --session <name> inspect <container-id>`
+- `wslc --session <name> exec <container-id> ...`
+- `wslc --session <name> images --format json`
+
+This is required for VS Code integration because unscoped `wslc` calls can resolve the wrong inventory or miss the `porthole-devcontainers` session entirely.

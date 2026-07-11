@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Porthole.Cli.Tests/Porthole.Cli.Tests.csproj" />
      <Project Path="tests/Porthole.Core.Tests/Porthole.Core.Tests.csproj" />
+    <Project Path="tests/Porthole.Tray.Tests/Porthole.Tray.Tests.csproj" />
   </Folder>
 </Solution>
