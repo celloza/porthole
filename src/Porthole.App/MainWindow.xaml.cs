@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Navigation;
 using Windows.Graphics;
 using Windows.UI;
 using WinRT.Interop;
@@ -11,6 +12,8 @@ namespace Porthole_App;
 
 public sealed partial class MainWindow : Window
 {
+    private bool _shellInitialized;
+
     public ShellViewModel ViewModel { get; }
 
     public void ApplyTheme(ElementTheme theme)
@@ -53,8 +56,28 @@ public sealed partial class MainWindow : Window
         }
         AppWindow.Title = ViewModel.WindowTitle;
         NavFrame.Navigate(typeof(HomePage));
+        _ = InitializeShellAsync();
         App.TraceStartup($"MainWindow HWND {WindowNative.GetWindowHandle(this)}");
         App.TraceStartup("MainWindow ctor complete");
+    }
+
+    private async Task InitializeShellAsync()
+    {
+        if (_shellInitialized)
+        {
+            return;
+        }
+
+        _shellInitialized = true;
+        try
+        {
+            await ViewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _shellInitialized = false;
+            App.TraceStartup($"InitializeShellAsync failed: {ex}");
+        }
     }
 
     private void ApplyCaptionButtonForeground(ElementTheme effectiveTheme)
@@ -99,7 +122,7 @@ public sealed partial class MainWindow : Window
         NavFrame.GoBack();
     }
 
-    private void NavFrame_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
+    private void NavFrame_Navigated(object sender, NavigationEventArgs args)
     {
         SyncNavViewToCurrentPage();
     }
@@ -112,6 +135,7 @@ public sealed partial class MainWindow : Window
         {
             NavView.SelectedItem = NavView.SettingsItem;
             ViewModel.SetSection("Settings");
+            SessionToolbarBorder.Visibility = Visibility.Collapsed;
             return;
         }
 
@@ -131,6 +155,9 @@ public sealed partial class MainWindow : Window
             return;
 
         ViewModel.SetSection(section);
+        SessionToolbarBorder.Visibility = currentPage == typeof(SessionsPage)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
         NavigationViewItem? match = NavView.MenuItems
             .OfType<NavigationViewItem>()
@@ -206,6 +233,15 @@ public sealed partial class MainWindow : Window
                 default:
                     throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");
             }
+        }
+    }
+
+    private void OpenSessionsToolbarButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (NavFrame.CurrentSourcePageType != typeof(SessionsPage))
+        {
+            ViewModel.SetSection("Sessions");
+            NavFrame.Navigate(typeof(SessionsPage));
         }
     }
 }

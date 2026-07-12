@@ -1,15 +1,20 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
 using System.Text.Json;
 using Microsoft.WSL.Containers;
 using Porthole.Core.Models;
+using Porthole.Core.Services;
 
 namespace Porthole.Tray.Services;
 
-internal sealed class WslcBackendService : IDisposable
+internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
 {
     private const int ContainerStateRunning = 2;
+    private const string DefaultActiveSessionName = "porthole-devcontainers";
+    private const int HrFileExists = unchecked((int)0x800700B7);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -21,21 +26,32 @@ internal sealed class WslcBackendService : IDisposable
         "Porthole",
         "Sessions");
 
+    private static readonly string DevContainerStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Porthole",
+        "DevContainers",
+        "containers.json");
+
     private readonly object _syncLock = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _sessionSettings = new(StringComparer.OrdinalIgnoreCase); // name -> storagePath
     private readonly Dictionary<string, string> _sessionStatuses = new(StringComparer.OrdinalIgnoreCase); // name -> "Running"|"Stopped"
-    private string _activeSessionName = "Porthole";
+    private string _activeSessionName = DefaultActiveSessionName;
     private NetworkMode _networkMode = NetworkMode.Bridge;
+
+    public WslcBackendService()
+    {
+        EnsureSessionInitialized(DefaultActiveSessionName);
+    }
 
     public IReadOnlyList<SessionSummary> ListSessions()
     {
         lock (_syncLock)
         {
-            return _sessions.Keys
+            return GetKnownSessionNamesLocked()
                 .Select(name => new SessionSummary(
                     name,
-                    _sessionSettings.TryGetValue(name, out string? path) ? path : string.Empty,
+                    GetSessionStoragePath(name),
                     string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -46,16 +62,7 @@ internal sealed class WslcBackendService : IDisposable
     {
         lock (_syncLock)
         {
-            if (_sessions.ContainsKey(name))
-            {
-                return;
-            }
-
-            var settings = CreateDefaultSessionSettings(name);
-            var session = new Session(settings);
-            session.Start();
-            _sessions[name] = session;
-            _sessionSettings[name] = settings.StoragePath;
+            EnsureSessionInitialized(name);
             _sessionStatuses[name] = "Running";
         }
     }
@@ -184,11 +191,7 @@ internal sealed class WslcBackendService : IDisposable
     {
         lock (_syncLock)
         {
-            if (!_sessions.ContainsKey(name))
-            {
-                CreateNamedSession(name);
-            }
-
+            EnsureSessionInitialized(name);
             _activeSessionName = name;
         }
     }
@@ -253,7 +256,7 @@ internal sealed class WslcBackendService : IDisposable
 
                 try
                 {
-                    string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
+                    string json = await RunWslcActiveSessionCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
                     using JsonDocument doc = JsonDocument.Parse(json);
 
                     // wslc inspect returns an array with one element
@@ -337,30 +340,80 @@ internal sealed class WslcBackendService : IDisposable
     public Session StartSession(string sessionName)
     {
         var session = new Session(CreateDefaultSessionSettings(sessionName));
-        session.Start();
+        StartSessionIfNeeded(session);
         return session;
     }
 
     public Task<IReadOnlyList<ImageSummary>> ListImagesAsync(CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var session = GetActiveSessionInstance();
+        return ListImagesCoreAsync(cancellationToken);
+    }
 
-        var images = session
-            .GetImages()
+    public async Task<DockerImageDetails> GetImageDetailsAsync(string imageReference, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(imageReference))
+        {
+            throw new InvalidOperationException("Image reference is required.");
+        }
+
+        string trimmedReference = imageReference.Trim();
+        IReadOnlyList<CliImageListItem> images = await ListImageItemsAsync(cancellationToken);
+        CliImageListItem? image = images.FirstOrDefault(candidate => ImageMatches(candidate, trimmedReference));
+
+        if (image is null)
+        {
+            throw new InvalidOperationException($"Image not found: {trimmedReference}");
+        }
+
+        string reference = BuildImageReference(image.Repository, image.Tag);
+        SplitReference(reference, out string repository, out string tag);
+        string digest = string.IsNullOrWhiteSpace(image.Id) ? reference : image.Id;
+
+        return new DockerImageDetails(
+            digest,
+            repository,
+            tag,
+            reference,
+            FromUnixTimeSecondsOrNow(image.Created),
+            image.Size);
+    }
+
+    private async Task<IReadOnlyList<ImageSummary>> ListImagesCoreAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CliImageListItem> images = await ListImageItemsAsync(cancellationToken);
+        return images
             .Select(ToImageSummary)
             .OrderBy(image => image.Repository, StringComparer.OrdinalIgnoreCase)
             .ThenBy(image => image.Tag, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
 
-        return Task.FromResult<IReadOnlyList<ImageSummary>>(images);
+    private async Task<IReadOnlyList<CliImageListItem>> ListImageItemsAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string json = await RunWslcActiveSessionCommandAsync("images --format json", cancellationToken);
+        IReadOnlyList<CliImageListItem>? images = JsonSerializer.Deserialize<IReadOnlyList<CliImageListItem>>(json, JsonOptions);
+        return images ?? [];
     }
 
     public async Task<IReadOnlyList<ContainerSummary>> ListContainersAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyList<ContainerListItem> containers = await GetContainersAsync(cancellationToken);
+        bool useDevContainerFallback;
+        lock (_syncLock)
+        {
+            useDevContainerFallback = string.Equals(_activeSessionName, DefaultActiveSessionName, StringComparison.OrdinalIgnoreCase);
+        }
+
+            IReadOnlyList<ContainerListItem> containers = await GetContainersAsync(cancellationToken);
+
+        if (containers.Count == 0 && useDevContainerFallback)
+        {
+            return LoadDevContainerStateSummaries();
+        }
 
         ContainerSummary[] mapped = containers
             .Select(container => new ContainerSummary(
@@ -368,12 +421,346 @@ internal sealed class WslcBackendService : IDisposable
                 container.Name,
                 container.Image,
                 container.State,
-                ToContainerStateText(container.State)))
+                ToContainerStateText(container.State),
+                FromUnixTimeSecondsOrNow(container.CreatedAt)))
             .OrderByDescending(container => container.IsRunning)
             .ThenBy(container => container.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         return mapped;
+    }
+
+    public async Task<string> InspectContainerJsonAsync(string containerReference, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(containerReference))
+        {
+            throw new InvalidOperationException("Container reference is required.");
+        }
+
+        try
+        {
+            string json = await RunWslcActiveSessionCommandAsync($"inspect {EscapeCliArgument(containerReference)}", cancellationToken);
+            using JsonDocument document = JsonDocument.Parse(json);
+
+            if (document.RootElement.ValueKind == JsonValueKind.Array && document.RootElement.GetArrayLength() > 0)
+            {
+                return document.RootElement[0].GetRawText();
+            }
+
+            return document.RootElement.GetRawText();
+        }
+        catch when (TryGetDevContainerStateRecord(containerReference, out StoredDevContainerRecord? record) && record is not null)
+        {
+            return record.InspectJson;
+        }
+    }
+
+    public async Task<string> GetContainerLogsAsync(
+        string containerReference,
+        string? tail,
+        bool timestamps,
+        string? since,
+        string? until,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(containerReference))
+        {
+            throw new InvalidOperationException("Container reference is required.");
+        }
+
+        var arguments = new StringBuilder();
+        arguments.Append("logs ");
+
+        if (!string.IsNullOrWhiteSpace(tail) && !string.Equals(tail, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            arguments.Append("--tail ");
+            arguments.Append(EscapeCliArgument(tail.Trim()));
+            arguments.Append(' ');
+        }
+
+        if (timestamps)
+        {
+            arguments.Append("--timestamps ");
+        }
+
+        if (!string.IsNullOrWhiteSpace(since))
+        {
+            arguments.Append("--since ");
+            arguments.Append(EscapeCliArgument(since.Trim()));
+            arguments.Append(' ');
+        }
+
+        if (!string.IsNullOrWhiteSpace(until))
+        {
+            arguments.Append("--until ");
+            arguments.Append(EscapeCliArgument(until.Trim()));
+            arguments.Append(' ');
+        }
+
+        arguments.Append(EscapeCliArgument(containerReference.Trim()));
+
+        try
+        {
+            return await RunWslcActiveSessionCommandAsync(arguments.ToString(), cancellationToken);
+        }
+        catch when (TryGetDevContainerStateRecord(containerReference, out StoredDevContainerRecord? _))
+        {
+            return string.Empty;
+        }
+    }
+
+    public async Task StreamContainerLogsAsync(
+        string containerReference,
+        Stream destination,
+        string? tail,
+        bool timestamps,
+        string? since,
+        string? until,
+        bool follow,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(containerReference))
+        {
+            throw new InvalidOperationException("Container reference is required.");
+        }
+
+        using System.Diagnostics.Process process = StartProcessCommand(
+            "wslc",
+            BuildSessionScopedWslcArguments(GetActiveSessionNameSnapshot(), BuildContainerLogsArguments(containerReference, tail, timestamps, since, until, follow)));
+        Task<string> standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+        try
+        {
+            await process.StandardOutput.BaseStream.CopyToAsync(destination, cancellationToken);
+            await destination.FlushAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch
+        {
+            TryTerminateProcess(process);
+            throw;
+        }
+
+        string standardError = await standardErrorTask;
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(standardError)
+                ? $"wslc logs failed with exit code {process.ExitCode}."
+                : standardError.Trim());
+        }
+    }
+
+    private static IReadOnlyList<ContainerSummary> LoadDevContainerStateSummaries()
+    {
+        return LoadDevContainerStateRecords()
+            .Select(record => BuildContainerSummary(record))
+            .OrderByDescending(container => container.IsRunning)
+            .ThenBy(container => container.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static ContainerSummary BuildContainerSummary(StoredDevContainerRecord record)
+    {
+        using JsonDocument document = JsonDocument.Parse(record.InspectJson);
+        JsonElement root = document.RootElement;
+
+        string image = root.TryGetProperty("Image", out JsonElement imageElement)
+            ? imageElement.GetString() ?? string.Empty
+            : string.Empty;
+
+        string stateText = "unknown";
+        bool isRunning = false;
+        if (root.TryGetProperty("State", out JsonElement stateElement) && stateElement.ValueKind == JsonValueKind.Object)
+        {
+            if (stateElement.TryGetProperty("Running", out JsonElement runningElement)
+                && runningElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                isRunning = runningElement.GetBoolean();
+            }
+
+            if (stateElement.TryGetProperty("Status", out JsonElement statusElement))
+            {
+                stateText = statusElement.GetString() ?? stateText;
+            }
+            else if (isRunning)
+            {
+                stateText = "running";
+            }
+        }
+
+        return new ContainerSummary(
+            record.Id,
+            record.Name ?? string.Empty,
+            image,
+            isRunning ? ContainerStateRunning : 0,
+            stateText,
+            TryParseCreatedAt(root, record.UpdatedAtUtc));
+    }
+
+    private static bool TryGetDevContainerStateRecord(string containerReference, out StoredDevContainerRecord? record)
+    {
+        record = LoadDevContainerStateRecords()
+            .FirstOrDefault(item =>
+                string.Equals(item.Id, containerReference, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(item.Name)
+                    && string.Equals(item.Name, containerReference, StringComparison.OrdinalIgnoreCase)));
+
+        return record is not null;
+    }
+
+    private static IReadOnlyList<StoredDevContainerRecord> LoadDevContainerStateRecords()
+    {
+        if (!File.Exists(DevContainerStatePath))
+        {
+            return [];
+        }
+
+        try
+        {
+            string json = File.ReadAllText(DevContainerStatePath);
+            return JsonSerializer.Deserialize<List<StoredDevContainerRecord>>(json, JsonOptions) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    public async Task<string> CreateDockerContainerAsync(
+        string image,
+        string? name,
+        IReadOnlyList<string>? command,
+        IReadOnlyList<string>? environment,
+        IReadOnlyList<string>? binds,
+        IReadOnlyList<string>? portMappings,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var config = new ContainerConfig(
+            Name: string.IsNullOrWhiteSpace(name) ? $"porthole-{Guid.NewGuid():N}"[..21] : name.Trim(),
+            ImageReference: image,
+            StartupCommand: command is null || command.Count == 0 ? null : string.Join(' ', command),
+            PortMappings: portMappings,
+            EnvironmentVariables: environment,
+            VolumeMounts: binds);
+
+        return await CreateContainerAsync(config, cancellationToken);
+    }
+
+    public async Task<DockerExecResult> ExecContainerAsync(
+        string containerReference,
+        IReadOnlyList<string> command,
+        string? workingDirectory,
+        IReadOnlyList<string>? environment,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(containerReference))
+        {
+            throw new InvalidOperationException("Container reference is required.");
+        }
+
+        if (command.Count == 0)
+        {
+            throw new InvalidOperationException("A command is required.");
+        }
+
+        string args = $"exec {EscapeCliArgument(containerReference)}";
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            args += $" --workdir {EscapeCliArgument(workingDirectory.Trim())}";
+        }
+
+        if (environment is not null)
+        {
+            foreach (string env in environment)
+            {
+                if (!string.IsNullOrWhiteSpace(env))
+                {
+                    args += $" --env {EscapeCliArgument(env.Trim())}";
+                }
+            }
+        }
+
+        foreach (string arg in command)
+        {
+            args += $" {EscapeCliArgument(arg)}";
+        }
+
+        try
+        {
+            string output = await RunWslcActiveSessionCommandAsync(args, cancellationToken);
+            return new DockerExecResult(0, output, string.Empty);
+        }
+        catch when (TryGetDevContainerStateRecord(containerReference, out StoredDevContainerRecord? record) && record is not null)
+        {
+            return await ExecStoredDevContainerAsync(record, command, workingDirectory, environment, cancellationToken);
+        }
+    }
+
+    private static async Task<DockerExecResult> ExecStoredDevContainerAsync(
+        StoredDevContainerRecord record,
+        IReadOnlyList<string> command,
+        string? workingDirectory,
+        IReadOnlyList<string>? environment,
+        CancellationToken cancellationToken)
+    {
+        string storagePath = Path.Combine(BaseStoragePath, DefaultActiveSessionName);
+        Directory.CreateDirectory(storagePath);
+
+        var sessionSettings = new SessionSettings(DefaultActiveSessionName, storagePath);
+        using var session = new Session(sessionSettings);
+        session.Start();
+
+        var containerSettings = new ContainerSettings(GetImageFromInspect(record.InspectJson))
+        {
+            Name = string.IsNullOrWhiteSpace(record.Name) ? record.Id[..12] : record.Name,
+        };
+
+        using var containerHandle = session.CreateContainer(containerSettings);
+
+        var processSettings = new ProcessSettings
+        {
+            CommandLine = command.ToArray(),
+            OutputMode = ProcessOutputMode.Stream,
+        };
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            processSettings.WorkingDirectory = workingDirectory.Trim();
+        }
+
+        if (environment is not null)
+        {
+            foreach (string env in environment)
+            {
+                int separatorIndex = env.IndexOf('=', StringComparison.Ordinal);
+                if (separatorIndex > 0)
+                {
+                    processSettings.EnvironmentVariables[env[..separatorIndex]] = env[(separatorIndex + 1)..];
+                }
+            }
+        }
+
+        using var process = containerHandle.CreateProcess(processSettings);
+        var standardOutput = new StringBuilder();
+        var standardError = new StringBuilder();
+        var exited = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        process.OutputReceived += data => standardOutput.Append(Encoding.UTF8.GetString(data));
+        process.ErrorReceived += data => standardError.Append(Encoding.UTF8.GetString(data));
+        process.Exited += exitCode => exited.TrySetResult(exitCode);
+
+        using CancellationTokenRegistration registration = cancellationToken.Register(() => exited.TrySetCanceled(cancellationToken));
+
+        process.Start();
+        int code = await exited.Task;
+        return new DockerExecResult(code, standardOutput.ToString(), standardError.ToString());
     }
 
     public async Task<IReadOnlyList<PodSummary>> ListPodsAsync(CancellationToken cancellationToken = default)
@@ -415,7 +802,7 @@ internal sealed class WslcBackendService : IDisposable
             throw new InvalidOperationException("Container reference is required.");
         }
 
-        await RunWslcCommandAsync($"start {EscapeCliArgument(containerReference)}", cancellationToken);
+        await RunWslcActiveSessionCommandAsync($"start {EscapeCliArgument(containerReference)}", cancellationToken);
     }
 
     public async Task StopContainerAsync(string containerReference, CancellationToken cancellationToken = default)
@@ -426,7 +813,7 @@ internal sealed class WslcBackendService : IDisposable
             throw new InvalidOperationException("Container reference is required.");
         }
 
-        await RunWslcCommandAsync($"stop {EscapeCliArgument(containerReference)}", cancellationToken);
+        await RunWslcActiveSessionCommandAsync($"stop {EscapeCliArgument(containerReference)}", cancellationToken);
     }
 
     public async Task RemoveContainerAsync(string containerReference, CancellationToken cancellationToken = default)
@@ -437,7 +824,7 @@ internal sealed class WslcBackendService : IDisposable
             throw new InvalidOperationException("Container reference is required.");
         }
 
-        await RunWslcCommandAsync($"remove {EscapeCliArgument(containerReference)}", cancellationToken);
+        await RunWslcActiveSessionCommandAsync($"remove {EscapeCliArgument(containerReference)}", cancellationToken);
     }
 
     public async Task<DashboardSnapshot> GetDashboardSnapshotAsync(CancellationToken cancellationToken = default)
@@ -596,7 +983,7 @@ internal sealed class WslcBackendService : IDisposable
             }
         }
 
-        string output = await RunWslcCommandAsync(args.ToString(), cancellationToken);
+        string output = await RunWslcActiveSessionCommandAsync(args.ToString(), cancellationToken);
         return output.Trim();
     }
 
@@ -604,7 +991,7 @@ internal sealed class WslcBackendService : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        string json = await RunWslcCommandAsync("volume ls --format json", cancellationToken);
+        string json = await RunWslcActiveSessionCommandAsync("volume ls --format json", cancellationToken);
         var items = JsonSerializer.Deserialize<List<VolumeListItem>>(json, JsonOptions) ?? [];
         MountSnapshot mountSnapshot = await GetMountTelemetryAsync(cancellationToken);
 
@@ -629,7 +1016,8 @@ internal sealed class WslcBackendService : IDisposable
                 false,
                 mount?.IsReadOnly ?? false,
                 "session local",
-                volume.Mountpoint);
+                volume.Mountpoint,
+                GetVolumeCreatedAtUtc(volume.Mountpoint, null));
         }
 
         foreach (MountTelemetry bindMount in mountSnapshot.BindMounts)
@@ -644,7 +1032,9 @@ internal sealed class WslcBackendService : IDisposable
                 bindMount.IsInUse,
                 true,
                 bindMount.IsReadOnly,
-                bindMount.ThroughputClass);
+                bindMount.ThroughputClass,
+                null,
+                GetVolumeCreatedAtUtc(null, bindMount.Source));
         }
 
         return volumes.Values
@@ -652,6 +1042,12 @@ internal sealed class WslcBackendService : IDisposable
             .ThenBy(volume => volume.IsBindMount)
             .ThenBy(volume => volume.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    public Task<DevContainerCapabilityReport> AnalyzeDevContainerConfigAsync(string devContainerConfigJson, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(DevContainerConfigAnalyzer.Analyze(devContainerConfigJson));
     }
 
     public async Task CreateVolumeAsync(string name, CancellationToken cancellationToken = default)
@@ -662,7 +1058,7 @@ internal sealed class WslcBackendService : IDisposable
             throw new InvalidOperationException("Volume name is required.");
         }
 
-        await RunWslcCommandAsync($"volume create {EscapeCliArgument(name.Trim())}", cancellationToken);
+        await RunWslcActiveSessionCommandAsync($"volume create {EscapeCliArgument(name.Trim())}", cancellationToken);
     }
 
     public async Task DeleteVolumeAsync(string name, CancellationToken cancellationToken = default)
@@ -680,16 +1076,16 @@ internal sealed class WslcBackendService : IDisposable
             throw new InvalidOperationException($"Volume '{trimmedName}' is still attached to a running container.");
         }
 
-        await RunWslcCommandAsync($"volume rm {EscapeCliArgument(trimmedName)}", cancellationToken);
+        await RunWslcActiveSessionCommandAsync($"volume rm {EscapeCliArgument(trimmedName)}", cancellationToken);
     }
 
     public async Task PruneVolumesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await RunWslcCommandAsync("volume prune --force", cancellationToken);
+        await RunWslcActiveSessionCommandAsync("volume prune --force", cancellationToken);
     }
 
-    private static async Task<MountSnapshot> GetMountTelemetryAsync(CancellationToken cancellationToken)
+    private async Task<MountSnapshot> GetMountTelemetryAsync(CancellationToken cancellationToken)
     {
         var namedVolumes = new Dictionary<string, MountTelemetry>(StringComparer.OrdinalIgnoreCase);
         var bindMounts = new List<MountTelemetry>();
@@ -699,7 +1095,7 @@ internal sealed class WslcBackendService : IDisposable
         {
             try
             {
-                string json = await RunWslcCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
+                string json = await RunWslcActiveSessionCommandAsync($"inspect {EscapeCliArgument(container.Name)}", cancellationToken);
                 using JsonDocument doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
@@ -844,28 +1240,101 @@ internal sealed class WslcBackendService : IDisposable
     {
         lock (_syncLock)
         {
-            if (!_sessions.TryGetValue(_activeSessionName, out Session? session))
-            {
-                var settings = CreateDefaultSessionSettings(_activeSessionName);
-                session = StartSession(_activeSessionName);
-                _sessions[_activeSessionName] = session;
-                _sessionSettings[_activeSessionName] = settings.StoragePath;
-                _sessionStatuses[_activeSessionName] = "Running";
-            }
-
-            return session;
+            EnsureSessionInitialized(_activeSessionName);
+            _sessionStatuses[_activeSessionName] = "Running";
+            return _sessions[_activeSessionName];
         }
     }
 
-    private static async Task<IReadOnlyList<ContainerListItem>> GetContainersAsync(CancellationToken cancellationToken)
+    private void EnsureSessionInitialized(string sessionName)
     {
-        string json = await RunWslcCommandAsync("list --all --format json", cancellationToken);
+        if (string.IsNullOrWhiteSpace(sessionName))
+        {
+            throw new InvalidOperationException("Session name is required.");
+        }
+
+        string normalizedName = sessionName.Trim();
+        if (_sessions.ContainsKey(normalizedName))
+        {
+            if (!_sessionSettings.ContainsKey(normalizedName))
+            {
+                _sessionSettings[normalizedName] = GetSessionStoragePath(normalizedName);
+            }
+
+            return;
+        }
+
+        var settings = CreateDefaultSessionSettings(normalizedName);
+        var session = new Session(settings);
+        StartSessionIfNeeded(session);
+        _sessions[normalizedName] = session;
+        _sessionSettings[normalizedName] = settings.StoragePath;
+    }
+
+    private static void StartSessionIfNeeded(Session session)
+    {
+        try
+        {
+            session.Start();
+        }
+        catch (COMException ex) when (ex.HResult == HrFileExists)
+        {
+            // The session storage and backing artifacts already exist. Treat this as
+            // attach-to-existing-session and keep using the Session instance.
+        }
+    }
+
+    private IEnumerable<string> GetKnownSessionNamesLocked()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string name in _sessions.Keys)
+        {
+            names.Add(name);
+        }
+
+        foreach (string name in _sessionSettings.Keys)
+        {
+            names.Add(name);
+        }
+
+        if (Directory.Exists(BaseStoragePath))
+        {
+            foreach (string directory in Directory.EnumerateDirectories(BaseStoragePath))
+            {
+                string? name = Path.GetFileName(directory);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    names.Add(name);
+                }
+            }
+        }
+
+        names.Add(_activeSessionName);
+        return names;
+    }
+
+    private static string GetSessionStoragePath(string sessionName)
+    {
+        return Path.Combine(BaseStoragePath, sessionName);
+    }
+
+    public DateTimeOffset GetActiveSessionCreatedAtUtc()
+    {
+        string sessionName = GetActiveSessionNameSnapshot();
+        string sessionPath = GetSessionStoragePath(sessionName);
+        return GetPathCreatedAtUtc(sessionPath);
+    }
+
+    private async Task<IReadOnlyList<ContainerListItem>> GetContainersAsync(CancellationToken cancellationToken)
+    {
+        string json = await RunWslcActiveSessionCommandAsync("list --all --format json", cancellationToken);
         return JsonSerializer.Deserialize<List<ContainerListItem>>(json, JsonOptions) ?? [];
     }
 
-    private static async Task<IReadOnlyList<ContainerStatsItem>> GetContainerStatsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ContainerStatsItem>> GetContainerStatsAsync(CancellationToken cancellationToken)
     {
-        string json = await RunWslcCommandAsync("stats --format json", cancellationToken);
+        string json = await RunWslcActiveSessionCommandAsync("stats --format json", cancellationToken);
         return JsonSerializer.Deserialize<List<ContainerStatsItem>>(json, JsonOptions) ?? [];
     }
 
@@ -874,15 +1343,96 @@ internal sealed class WslcBackendService : IDisposable
         return await RunProcessCommandAsync("wslc", arguments, cancellationToken);
     }
 
+    private Task<string> RunWslcActiveSessionCommandAsync(string arguments, CancellationToken cancellationToken)
+    {
+        return RunWslcCommandAsync(BuildSessionScopedWslcArguments(GetActiveSessionNameSnapshot(), arguments), cancellationToken);
+    }
+
+    private string GetActiveSessionNameSnapshot()
+    {
+        lock (_syncLock)
+        {
+            return _activeSessionName;
+        }
+    }
+
+    private static string BuildSessionScopedWslcArguments(string sessionName, string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(sessionName))
+        {
+            return arguments;
+        }
+
+        return $"--session {EscapeCliArgument(sessionName.Trim())} {arguments}";
+    }
+
+    private static string GetImageFromInspect(string inspectJson)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(inspectJson);
+            JsonElement root = document.RootElement;
+            if (root.TryGetProperty("Image", out JsonElement imageElement))
+            {
+                return imageElement.GetString() ?? "alpine:latest";
+            }
+        }
+        catch
+        {
+        }
+
+        return "alpine:latest";
+    }
+
+    private static string BuildContainerLogsArguments(
+        string containerReference,
+        string? tail,
+        bool timestamps,
+        string? since,
+        string? until,
+        bool follow)
+    {
+        var arguments = new StringBuilder();
+        arguments.Append("logs ");
+
+        if (follow)
+        {
+            arguments.Append("--follow ");
+        }
+
+        if (!string.IsNullOrWhiteSpace(tail) && !string.Equals(tail, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            arguments.Append("--tail ");
+            arguments.Append(EscapeCliArgument(tail.Trim()));
+            arguments.Append(' ');
+        }
+
+        if (timestamps)
+        {
+            arguments.Append("--timestamps ");
+        }
+
+        if (!string.IsNullOrWhiteSpace(since))
+        {
+            arguments.Append("--since ");
+            arguments.Append(EscapeCliArgument(since.Trim()));
+            arguments.Append(' ');
+        }
+
+        if (!string.IsNullOrWhiteSpace(until))
+        {
+            arguments.Append("--until ");
+            arguments.Append(EscapeCliArgument(until.Trim()));
+            arguments.Append(' ');
+        }
+
+        arguments.Append(EscapeCliArgument(containerReference.Trim()));
+        return arguments.ToString();
+    }
+
     private static async Task<string> RunProcessCommandAsync(string fileName, string arguments, CancellationToken cancellationToken)
     {
-        using var process = System.Diagnostics.Process.Start(new ProcessStartInfo(fileName, arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        }) ?? throw new InvalidOperationException("Failed to start wslc.");
+        using System.Diagnostics.Process process = StartProcessCommand(fileName, arguments);
 
         Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         Task<string> standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -901,6 +1451,45 @@ internal sealed class WslcBackendService : IDisposable
 
         return standardOutput;
     }
+
+    private static System.Diagnostics.Process StartProcessCommand(string fileName, string arguments)
+    {
+        return System.Diagnostics.Process.Start(new ProcessStartInfo(fileName, arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        }) ?? throw new InvalidOperationException($"Failed to start {fileName}.");
+    }
+
+    private static void TryTerminateProcess(System.Diagnostics.Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed record StoredDevContainerRecord(
+        string Id,
+        string? Name,
+        string InspectJson,
+        DateTimeOffset UpdatedAtUtc);
+
+    public sealed record DockerImageDetails(
+        string Id,
+        string Repository,
+        string Tag,
+        string Reference,
+        DateTimeOffset CreatedAt,
+        ulong Size);
 
     private static string FormatCpuUsage(IReadOnlyList<ContainerStatsItem> stats)
     {
@@ -1024,6 +1613,43 @@ internal sealed class WslcBackendService : IDisposable
         return $"{size:0.##} {units[unitIndex]}";
     }
 
+    private static bool ImageMatches(ImageInfo image, string imageReference)
+    {
+        if (string.Equals(image.Name, imageReference, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        byte[] digestBytes = image.Sha256?.ToArray() ?? [];
+        if (digestBytes.Length > 0)
+        {
+            string digest = $"sha256:{Convert.ToHexString(digestBytes).ToLowerInvariant()}";
+            if (string.Equals(digest, imageReference, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        SplitReference(image.Name, out string repository, out string tag);
+        return string.Equals($"{repository}:{tag}", imageReference, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ImageMatches(CliImageListItem image, string imageReference)
+    {
+        string reference = BuildImageReference(image.Repository, image.Tag);
+        if (string.Equals(reference, imageReference, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(image.Id) && string.Equals(image.Id, imageReference, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(image.Repository, imageReference, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static ImageSummary ToImageSummary(ImageInfo image)
     {
         string reference = image.Name;
@@ -1039,7 +1665,39 @@ internal sealed class WslcBackendService : IDisposable
             tag,
             ToRelativeText(image.CreatedTimestamp),
             ToSizeLabel(image.Size),
-            reference);
+            reference,
+            image.CreatedTimestamp,
+            ToSizeBytes(image.Size));
+    }
+
+    private static ImageSummary ToImageSummary(CliImageListItem image)
+    {
+        string reference = BuildImageReference(image.Repository, image.Tag);
+        string digest = string.IsNullOrWhiteSpace(image.Id) ? reference : image.Id;
+
+        return new ImageSummary(
+            digest,
+            image.Repository,
+            string.IsNullOrWhiteSpace(image.Tag) ? "latest" : image.Tag,
+            ToRelativeText(FromUnixTimeSecondsOrNow(image.Created)),
+            ToSizeLabel(image.Size),
+            reference,
+            FromUnixTimeSecondsOrNow(image.Created),
+            ToSizeBytes(image.Size));
+
+    }
+
+    private static long ToSizeBytes(ulong size)
+    {
+        return size > long.MaxValue ? long.MaxValue : (long)size;
+    }
+
+    private static string BuildImageReference(string repository, string? tag)
+    {
+        string normalizedTag = string.IsNullOrWhiteSpace(tag) ? "latest" : tag.Trim();
+        return string.IsNullOrWhiteSpace(repository)
+            ? normalizedTag
+            : $"{repository}:{normalizedTag}";
     }
 
     private static void SplitReference(string imageReference, out string repository, out string tag)
@@ -1200,7 +1858,11 @@ internal sealed class WslcBackendService : IDisposable
         return args;
     }
 
-    private sealed record ContainerListItem(string Id, string Name, string Image, int State);
+    private sealed record ContainerListItem(string Id, string Name, string Image, int State, long CreatedAt);
+
+    private sealed record CliImageListItem(string Id, string Repository, string Tag, long Created, ulong Size);
+
+    public sealed record DockerExecResult(int ExitCode, string StandardOutput, string StandardError);
 
     private sealed record ContainerStatsItem(string CPUPerc, string MemUsage);
 
@@ -1217,4 +1879,59 @@ internal sealed class WslcBackendService : IDisposable
     private sealed record VolumeUsageData(long? Size, int? RefCount);
 
     private sealed record VolumeListItem(string? Name, string? Driver, string? Mountpoint, VolumeUsageData? UsageData);
+
+    private static DateTimeOffset FromUnixTimeSecondsOrNow(long unixSeconds)
+    {
+        return unixSeconds > 0
+            ? DateTimeOffset.FromUnixTimeSeconds(unixSeconds)
+            : DateTimeOffset.UtcNow;
+    }
+
+    private static DateTimeOffset TryParseCreatedAt(JsonElement root, DateTimeOffset fallback)
+    {
+        if (root.TryGetProperty("Created", out JsonElement createdElement)
+            && createdElement.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(createdElement.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset createdAt))
+        {
+            return createdAt.ToUniversalTime();
+        }
+
+        return fallback;
+    }
+
+    private static DateTimeOffset? GetVolumeCreatedAtUtc(string? mountPoint, string? hostPath)
+    {
+        if (!string.IsNullOrWhiteSpace(mountPoint))
+        {
+            return GetPathCreatedAtUtc(mountPoint);
+        }
+
+        if (!string.IsNullOrWhiteSpace(hostPath))
+        {
+            return GetPathCreatedAtUtc(hostPath);
+        }
+
+        return null;
+    }
+
+    private static DateTimeOffset GetPathCreatedAtUtc(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                return Directory.GetCreationTimeUtc(path);
+            }
+
+            if (File.Exists(path))
+            {
+                return File.GetCreationTimeUtc(path);
+            }
+        }
+        catch
+        {
+        }
+
+        return DateTimeOffset.UtcNow;
+    }
 }

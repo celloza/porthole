@@ -1,11 +1,14 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/porthole-cli/porthole-cli.csproj" />
     <Project Path="src/Porthole.App/Porthole.App.csproj" />
     <Project Path="src/Porthole.Core/Porthole.Core.csproj" />
     <Project Path="src/Porthole.Installer/Porthole.Installer.wixproj" />
     <Project Path="src/Porthole.Tray/Porthole.Tray.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Porthole.Core.Tests/Porthole.Core.Tests.csproj" />
+    <Project Path="tests/Porthole.Cli.Tests/Porthole.Cli.Tests.csproj" />
+     <Project Path="tests/Porthole.Core.Tests/Porthole.Core.Tests.csproj" />
+    <Project Path="tests/Porthole.Tray.Tests/Porthole.Tray.Tests.csproj" />
   </Folder>
 </Solution>

@@ -5,7 +5,8 @@ public sealed record ContainerSummary(
     string Name,
     string Image,
     int State,
-    string StateText)
+    string StateText,
+    DateTimeOffset CreatedAtUtc)
 {
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? ShortId : Name;
 

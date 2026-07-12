@@ -347,6 +347,15 @@ internal sealed class NamedPipeImageCatalogServer(WslcBackendService backendServ
                         await WriteResponseSafeAsync(new ImageCatalogResponse(ImageCatalogMessageKind.Response, Message: "Volumes pruned."));
                         Log("Prune volumes response sent.");
                         break;
+                    case ImageCatalogOperation.AnalyzeDevContainerConfig:
+                        await WriteResponseSafeAsync(
+                            new ImageCatalogResponse(
+                                ImageCatalogMessageKind.Response,
+                                DevContainerCapability: await backendService.AnalyzeDevContainerConfigAsync(
+                                    request.DevContainerConfigJson ?? throw new IOException("DevContainer config json is required."),
+                                    cancellationToken)));
+                        Log("DevContainer diagnostics response sent.");
+                        break;
                     default:
                         throw new InvalidOperationException($"Unsupported image operation: {request.Operation}");
                 }

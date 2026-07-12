@@ -26,6 +26,7 @@ internal static class Program
 
 	private sealed class TrayApplicationContext : ApplicationContext
 	{
+		private readonly DockerApiServer _dockerApiServer;
 		private readonly NamedPipeImageCatalogServer _imageServer;
 		private readonly WslcBackendService _backendService;
 		private readonly ContextMenuStrip _menu;
@@ -34,9 +35,13 @@ internal static class Program
 
 		public TrayApplicationContext()
 		{
+			var configurationStore = new TrayConfigurationStore();
+			TrayConfiguration configuration = configurationStore.Load();
 			_backendService = new WslcBackendService();
 			_imageServer = new NamedPipeImageCatalogServer(_backendService);
+			_dockerApiServer = new DockerApiServer(_backendService, configuration.DockerApi);
 			_imageServer.Start();
+			_dockerApiServer.Start();
 
 			_menu = new ContextMenuStrip();
 			_menu.Items.Add("Open dashboard", null, (_, _) => LaunchDashboard());
@@ -75,6 +80,7 @@ internal static class Program
 			_notifyIcon.Visible = false;
 			_notifyIcon.Dispose();
 			_menu.Dispose();
+			_dockerApiServer.Dispose();
 			_imageServer.Dispose();
 			_backendService.Dispose();
 			base.ExitThreadCore();

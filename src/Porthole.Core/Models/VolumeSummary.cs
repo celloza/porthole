@@ -10,7 +10,8 @@ public sealed record VolumeSummary(
     bool IsBindMount = false,
     bool IsReadOnly = false,
     string? ThroughputClass = null,
-    string? SessionMountPoint = null)
+    string? SessionMountPoint = null,
+    DateTimeOffset? CreatedAtUtc = null)
 {
     public string DisplayName => string.IsNullOrWhiteSpace(HostPath)
         ? (string.IsNullOrWhiteSpace(Name) ? MountPoint : Name)

@@ -53,8 +53,8 @@ public class ViewModelTests
 
         var containers = new List<ContainerSummary>
         {
-            new("id1", "web", "nginx", 2, "Running"),
-            new("id2", "cache", "redis", 6, "Stopped"),
+            new("id1", "web", "nginx", 2, "Running", DateTimeOffset.Parse("2026-07-11T12:00:00Z")),
+            new("id2", "cache", "redis", 6, "Stopped", DateTimeOffset.Parse("2026-07-10T12:00:00Z")),
         };
 
         var pods = new List<PodSummary>
@@ -100,6 +100,38 @@ public class ViewModelTests
 
         Assert.Contains(viewModel.Sessions, s => s.Name == "dev-env");
         Assert.Empty(viewModel.NewSessionName);
+    }
+
+    [Fact]
+    public async Task ShellViewModel_Initialize_LoadsSessionsAndActiveSelection()
+    {
+        var sessionService = new FakeSessionService();
+        var viewModel = new ShellViewModel(sessionService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(2, viewModel.Sessions.Count);
+        Assert.Equal("default", viewModel.ActiveSessionName);
+        Assert.NotNull(viewModel.SelectedSession);
+        Assert.Equal("default", viewModel.SelectedSession!.Name);
+        Assert.Equal("Session: default", viewModel.ActiveSessionDisplay);
+    }
+
+    [Fact]
+    public async Task ShellViewModel_ChangingSelectedSession_AutoSwitchesActiveSession()
+    {
+        var sessionService = new FakeSessionService();
+        var viewModel = new ShellViewModel(sessionService);
+
+        await viewModel.InitializeAsync();
+        viewModel.SelectedSession = viewModel.Sessions.Single(session => session.Name == "staging");
+
+        await WaitForConditionAsync(() => viewModel.ActiveSessionName == "staging");
+
+        Assert.Equal("staging", viewModel.ActiveSessionName);
+        Assert.NotNull(viewModel.SelectedSession);
+        Assert.Equal("staging", viewModel.SelectedSession!.Name);
+        Assert.Equal("2 sessions loaded.", viewModel.SessionStatus);
     }
 
     [Fact]
@@ -177,13 +209,27 @@ public class ViewModelTests
 
         var containers = new List<ContainerSummary>
         {
-            new("id1", "web", "nginx", 2, "Running"),
-            new("id2", "api", "node", 2, "Running"),
+            new("id1", "web", "nginx", 2, "Running", DateTimeOffset.Parse("2026-07-11T12:00:00Z")),
+            new("id2", "api", "node", 2, "Running", DateTimeOffset.Parse("2026-07-11T11:00:00Z")),
         };
 
         viewModel.ApplyCatalogUpdate(containers, []);
 
         Assert.Equal("2 running / 0 stopped", viewModel.RunningCountLabel);
+    }
+
+    private static async Task WaitForConditionAsync(Func<bool> condition, int timeoutMilliseconds = 1000)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException("Condition was not met before the timeout elapsed.");
+            }
+
+            await Task.Delay(10);
+        }
     }
 
     [Fact]
@@ -790,7 +836,7 @@ public class ViewModelTests
 
         public Task<string> GetActiveSessionNameAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult("default");
+            return Task.FromResult(_sessions.FirstOrDefault(session => session.IsActive)?.Name ?? string.Empty);
         }
 
         public Task PauseSessionAsync(string name, CancellationToken cancellationToken = default)

@@ -44,6 +44,9 @@ public enum ImageCatalogOperation
     CreateVolume = 41,
     DeleteVolume = 42,
     PruneVolumes = 43,
+
+    // DevContainer diagnostics
+    AnalyzeDevContainerConfig = 50,
 }
 
 public enum ImageCatalogMessageKind
@@ -62,7 +65,8 @@ public sealed record ImageCatalogRequest(
     string? SessionName = null,
     NetworkMode? NetworkMode = null,
     ContainerConfig? ContainerConfig = null,
-    string? VolumeName = null);
+    string? VolumeName = null,
+    string? DevContainerConfigJson = null);
 
 public sealed record ImageCatalogResponse(
     ImageCatalogMessageKind Kind,
@@ -75,4 +79,5 @@ public sealed record ImageCatalogResponse(
     IReadOnlyList<SessionSummary>? Sessions = null,
     NetworkingSnapshot? NetworkingSnapshot = null,
     IReadOnlyList<VolumeSummary>? Volumes = null,
-    IReadOnlyList<SessionSnapshot>? TraySnapshots = null);
+    IReadOnlyList<SessionSnapshot>? TraySnapshots = null,
+    DevContainerCapabilityReport? DevContainerCapability = null);
