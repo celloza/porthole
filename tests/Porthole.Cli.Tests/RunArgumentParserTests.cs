@@ -26,6 +26,16 @@ public class RunArgumentParserTests
     }
 
     [Fact]
+    public void ParseVolume_NamedVolume_ParsesCorrectly()
+    {
+        var mount = RunArgumentParser.ParseVolume("named-data:/workspace");
+
+        Assert.Equal("named-data", mount.HostPath);
+        Assert.Equal("/workspace", mount.ContainerPath);
+        Assert.False(mount.ReadOnly);
+    }
+
+    [Fact]
     public void ParseVolume_InvalidFormat_Throws()
     {
         Assert.Throws<InvalidOperationException>(() => RunArgumentParser.ParseVolume("bad-volume"));

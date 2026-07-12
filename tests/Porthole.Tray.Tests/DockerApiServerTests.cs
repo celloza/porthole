@@ -93,7 +93,9 @@ public sealed class DockerApiServerTests
             "latest",
             "25 days ago",
             "8.02 MB",
-            "alpine:latest"));
+            "alpine:latest",
+            DateTimeOffset.Parse("2026-06-16T00:01:29Z"),
+            8415579));
         backend.ImageDetails["alpine:latest"] = new WslcBackendService.DockerImageDetails(
             "sha256:d529dd0c6e5597ac7e4a3e2dea65c3fcc6173f4cae713c409265c1dd9914a11b",
             "alpine",
@@ -113,7 +115,7 @@ public sealed class DockerApiServerTests
         Assert.Equal("alpine:latest", Assert.Single(image.GetProperty("RepoTags").EnumerateArray()).GetString());
         Assert.Equal(1781568089L, image.GetProperty("Created").GetInt64());
         Assert.Equal(8415579L, image.GetProperty("Size").GetInt64());
-        Assert.Contains("alpine:latest", backend.ImageDetailRequests);
+        Assert.Empty(backend.ImageDetailRequests);
     }
 
     [Fact]
@@ -189,7 +191,7 @@ public sealed class DockerApiServerTests
 
         await using var host = await DockerApiServerHarness.StartAsync(backend);
 
-        const string createBody = "{\"Cmd\":[\"sh\",\"-lc\",\"echo hi\"],\"WorkingDir\":\"/workspace\",\"Env\":[\"A=1\",\"B=two\"]}";
+        const string createBody = "{\"Cmd\":[\"sh\",\"-lc\",\"echo hi\"],\"WorkingDir\":\"/workspace\",\"Env\":[\"A=1\",\"B=naïve\"]}";
         PipeHttpResponse createResponse = await host.SendAsync(HttpRequest("POST", "/v1.52/containers/vscode-probe/exec", createBody, "application/json"));
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
@@ -206,7 +208,7 @@ public sealed class DockerApiServerTests
         Assert.NotNull(backend.LastExecRequest);
         Assert.Equal("vscode-probe", backend.LastExecRequest!.ContainerReference);
         Assert.Equal("/workspace", backend.LastExecRequest.WorkingDirectory);
-        Assert.Equal(new[] { "A=1", "B=two" }, backend.LastExecRequest.Environment);
+        Assert.Equal(new[] { "A=1", "B=naïve" }, backend.LastExecRequest.Environment);
         Assert.Equal(new[] { "sh", "-lc", "echo hi" }, backend.LastExecRequest.Command);
     }
 
@@ -371,7 +373,7 @@ public sealed class DockerApiServerTests
             using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
             await client.ConnectAsync(5000);
 
-            byte[] requestBytes = Encoding.ASCII.GetBytes(request);
+            byte[] requestBytes = Encoding.UTF8.GetBytes(request);
             await client.WriteAsync(requestBytes);
             await client.FlushAsync();
 

@@ -1561,7 +1561,9 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             tag,
             ToRelativeText(image.CreatedTimestamp),
             ToSizeLabel(image.Size),
-            reference);
+            reference,
+            image.CreatedTimestamp,
+            ToSizeBytes(image.Size));
     }
 
     private static ImageSummary ToImageSummary(CliImageListItem image)
@@ -1575,7 +1577,15 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             string.IsNullOrWhiteSpace(image.Tag) ? "latest" : image.Tag,
             ToRelativeText(FromUnixTimeSecondsOrNow(image.Created)),
             ToSizeLabel(image.Size),
-            reference);
+            reference,
+            FromUnixTimeSecondsOrNow(image.Created),
+            ToSizeBytes(image.Size));
+
+    }
+
+    private static long ToSizeBytes(ulong size)
+    {
+        return size > long.MaxValue ? long.MaxValue : (long)size;
     }
 
     private static string BuildImageReference(string repository, string? tag)

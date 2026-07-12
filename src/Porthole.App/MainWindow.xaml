@@ -125,13 +125,17 @@
                                 Text="{x:Bind ViewModel.ActiveSessionDisplay, Mode=OneWay}" />
                             <ComboBox
                                 x:Name="SessionPicker"
+                                AutomationProperties.Name="Active session selector"
                                 MinWidth="220"
                                 DisplayMemberPath="Name"
                                 IsEnabled="{x:Bind ViewModel.HasSessions, Mode=OneWay}"
                                 ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}"
                                 PlaceholderText="No sessions"
                                 SelectedItem="{x:Bind ViewModel.SelectedSession, Mode=TwoWay}" />
-                            <Button Command="{x:Bind ViewModel.RefreshSessionsCommand}" ToolTipService.ToolTip="Refresh sessions">
+                            <Button
+                                AutomationProperties.Name="Refresh sessions"
+                                Command="{x:Bind ViewModel.RefreshSessionsCommand}"
+                                ToolTipService.ToolTip="Refresh sessions">
                                 <FontIcon FontSize="12" Glyph="&#xE72C;" />
                             </Button>
                         </StackPanel>
@@ -152,7 +156,10 @@
                                 Opacity="0.78"
                                 Text="{x:Bind ViewModel.SessionStatus, Mode=OneWay}"
                                 TextTrimming="CharacterEllipsis" />
-                            <Button Click="OpenSessionsToolbarButton_Click" ToolTipService.ToolTip="Manage sessions">
+                            <Button
+                                AutomationProperties.Name="Manage sessions"
+                                Click="OpenSessionsToolbarButton_Click"
+                                ToolTipService.ToolTip="Manage sessions">
                                 <FontIcon FontSize="12" Glyph="&#xE8A7;" />
                             </Button>
                         </StackPanel>

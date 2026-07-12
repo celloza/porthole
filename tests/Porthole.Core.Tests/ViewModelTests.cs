@@ -126,7 +126,7 @@ public class ViewModelTests
         await viewModel.InitializeAsync();
         viewModel.SelectedSession = viewModel.Sessions.Single(session => session.Name == "staging");
 
-        await Task.Delay(50);
+        await WaitForConditionAsync(() => viewModel.ActiveSessionName == "staging");
 
         Assert.Equal("staging", viewModel.ActiveSessionName);
         Assert.NotNull(viewModel.SelectedSession);
@@ -216,6 +216,20 @@ public class ViewModelTests
         viewModel.ApplyCatalogUpdate(containers, []);
 
         Assert.Equal("2 running / 0 stopped", viewModel.RunningCountLabel);
+    }
+
+    private static async Task WaitForConditionAsync(Func<bool> condition, int timeoutMilliseconds = 1000)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException("Condition was not met before the timeout elapsed.");
+            }
+
+            await Task.Delay(10);
+        }
     }
 
     [Fact]

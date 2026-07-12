@@ -6,7 +6,9 @@ public sealed record ImageSummary(
     string Tag,
     string CreatedRelative,
     string SizeLabel,
-    string Reference)
+    string Reference,
+    DateTimeOffset? CreatedAtUtc = null,
+    long? SizeBytes = null)
 {
     public string DisplayName => $"{Repository}:{Tag}";
 

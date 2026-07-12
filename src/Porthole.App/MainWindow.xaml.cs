@@ -69,7 +69,15 @@ public sealed partial class MainWindow : Window
         }
 
         _shellInitialized = true;
-        await ViewModel.InitializeAsync();
+        try
+        {
+            await ViewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _shellInitialized = false;
+            App.TraceStartup($"InitializeShellAsync failed: {ex}");
+        }
     }
 
     private void ApplyCaptionButtonForeground(ElementTheme effectiveTheme)

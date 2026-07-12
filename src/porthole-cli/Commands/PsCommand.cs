@@ -56,6 +56,11 @@ internal sealed class PsCommand : Command
         {
             var entries = ContainerStateStore.GetAll();
 
+            if (!all)
+            {
+                entries = entries.Where(IsRunning).ToList();
+            }
+
             // Apply label/name filters that Dev Containers commonly uses.
             // e.g. --filter label=devcontainer.local_folder=...
             foreach (string filter in filters)
@@ -99,24 +104,26 @@ internal sealed class PsCommand : Command
         }
     }
 
-    private static object BuildRow(StoredContainerRecord e)
+    private static bool IsRunning(StoredContainerRecord entry)
     {
-        // Parse running state from stored inspect JSON.
-        bool running = false;
-        string status = "exited";
         try
         {
-            using var doc = JsonDocument.Parse(e.InspectJson);
-            if (doc.RootElement.TryGetProperty("State", out var stateElem)
+            using var doc = JsonDocument.Parse(entry.InspectJson);
+            return doc.RootElement.TryGetProperty("State", out var stateElem)
                 && stateElem.ValueKind == JsonValueKind.Object
                 && stateElem.TryGetProperty("Running", out var runningElem)
-                && runningElem.ValueKind == JsonValueKind.True)
-            {
-                running = true;
-                status = "running";
-            }
+                && runningElem.ValueKind == JsonValueKind.True;
         }
-        catch { }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static object BuildRow(StoredContainerRecord e)
+    {
+        bool running = IsRunning(e);
+        string status = running ? "running" : "exited";
 
         return new
         {

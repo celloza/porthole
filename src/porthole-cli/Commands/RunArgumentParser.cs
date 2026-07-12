@@ -9,17 +9,16 @@ internal static class RunArgumentParser
     public static VolumeMount ParseVolume(string raw)
     {
         // Docker-style mount format: hostPath:containerPath[:ro|rw].
-        // Handle Windows drive prefixes like C:\repo:/workspace.
-        int firstSeparator = raw.IndexOf(':');
-        int secondSeparator = raw.IndexOf(':', firstSeparator + 1);
+        // Handle Windows drive prefixes like C:\repo:/workspace and named volumes like data:/workspace.
+        int separator = GetHostContainerSeparator(raw);
 
-        if (firstSeparator <= 0 || secondSeparator <= firstSeparator)
+        if (separator <= 0)
         {
             throw new InvalidOperationException($"Invalid volume mapping '{raw}'. Expected hostPath:containerPath[:ro|rw].");
         }
 
-        string hostPath = raw[..secondSeparator].Trim();
-        string remainder = raw[(secondSeparator + 1)..].Trim();
+        string hostPath = raw[..separator].Trim();
+        string remainder = raw[(separator + 1)..].Trim();
 
         string containerPath;
         bool readOnly = false;
@@ -41,6 +40,23 @@ internal static class RunArgumentParser
         }
 
         return new VolumeMount(hostPath, containerPath, readOnly);
+    }
+
+    private static int GetHostContainerSeparator(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return -1;
+        }
+
+        bool hasWindowsDrivePrefix = raw.Length >= 3
+            && char.IsLetter(raw[0])
+            && raw[1] == ':'
+            && (raw[2] == '\\' || raw[2] == '/');
+
+        return hasWindowsDrivePrefix
+            ? raw.IndexOf(':', 2)
+            : raw.IndexOf(':');
     }
 
     public static ContainerPortMapping ParsePortMapping(string raw)

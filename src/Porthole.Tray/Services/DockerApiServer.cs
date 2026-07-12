@@ -24,10 +24,13 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
 
     private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly object _pipeServerGate = new();
+    private readonly List<NamedPipeServerStream> _pendingPipeServers = [];
     private Task? _httpLoop;
     private Task[] _pipeLoops = [];
-    private readonly string _httpPrefix = Environment.GetEnvironmentVariable("PORTHOLE_DOCKER_API_URL")
-        ?? NormalizePrefix(configuration.HttpUrl);
+    private readonly string _httpPrefix = NormalizePrefix(
+        Environment.GetEnvironmentVariable("PORTHOLE_DOCKER_API_URL")
+        ?? configuration.HttpUrl);
     private readonly string[] _pipeNames = GetConfiguredPipeNames(configuration);
     private readonly bool _requestLoggingEnabled = IsLoggingEnabled(configuration);
 
@@ -51,6 +54,7 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
     {
         Log("Docker API server dispose requested.");
         _shutdown.Cancel();
+        DisposePendingPipeServers();
 
         if (_listener.IsListening)
         {
@@ -145,23 +149,69 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
                 NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous);
+            RegisterPendingPipeServer(server);
 
             try
             {
                 Log($"Waiting for Docker API pipe client on '{pipeName}'.");
                 await server.WaitForConnectionAsync(cancellationToken);
+                UnregisterPendingPipeServer(server);
                 Log($"Docker API pipe client connected on '{pipeName}'.");
                 _ = Task.Run(() => HandlePipeConnectionAsync(server, pipeName, cancellationToken), cancellationToken);
             }
             catch (OperationCanceledException)
             {
+                UnregisterPendingPipeServer(server);
                 server.Dispose();
+                return;
+            }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                UnregisterPendingPipeServer(server);
                 return;
             }
             catch
             {
+                UnregisterPendingPipeServer(server);
                 server.Dispose();
                 throw;
+            }
+        }
+    }
+
+    private void RegisterPendingPipeServer(NamedPipeServerStream server)
+    {
+        lock (_pipeServerGate)
+        {
+            _pendingPipeServers.Add(server);
+        }
+    }
+
+    private void UnregisterPendingPipeServer(NamedPipeServerStream server)
+    {
+        lock (_pipeServerGate)
+        {
+            _pendingPipeServers.Remove(server);
+        }
+    }
+
+    private void DisposePendingPipeServers()
+    {
+        NamedPipeServerStream[] pendingServers;
+        lock (_pipeServerGate)
+        {
+            pendingServers = _pendingPipeServers.ToArray();
+            _pendingPipeServers.Clear();
+        }
+
+        foreach (NamedPipeServerStream pendingServer in pendingServers)
+        {
+            try
+            {
+                pendingServer.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
             }
         }
     }
@@ -306,18 +356,13 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
         if (path == "/images/json" && method == "GET")
         {
             IReadOnlyList<ImageSummary> images = await backendService.ListImagesAsync(cancellationToken);
-            var payload = new List<object>(images.Count);
-            foreach (ImageSummary image in images)
+            var payload = images.Select(image => new
             {
-                var details = await backendService.GetImageDetailsAsync(image.Reference, cancellationToken);
-                payload.Add(new
-                {
-                    Id = image.Id,
-                    RepoTags = new[] { image.Reference },
-                    Created = details.CreatedAt.ToUnixTimeSeconds(),
-                    Size = details.Size,
-                });
-            }
+                Id = image.Id,
+                RepoTags = new[] { image.Reference },
+                Created = (image.CreatedAtUtc ?? backendService.GetActiveSessionCreatedAtUtc()).ToUnixTimeSeconds(),
+                Size = image.SizeBytes ?? 0,
+            });
 
             return CreateJsonResponse(HttpStatusCode.OK, payload);
         }
@@ -589,9 +634,8 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
 
     private static async Task<DockerApiRequest> ReadPipeRequestAsync(Stream stream, string pipeName, CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(stream, Encoding.ASCII, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+        (string requestLine, Dictionary<string, string> headers, byte[] bufferedBody) = await ReadPipeHeadersAsync(stream, cancellationToken);
 
-        string requestLine = await ReadRequiredLineAsync(reader, cancellationToken);
         string[] requestLineParts = requestLine.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
         if (requestLineParts.Length < 2)
         {
@@ -600,26 +644,6 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
 
         string method = requestLineParts[0].ToUpperInvariant();
         string rawTarget = requestLineParts[1];
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        while (true)
-        {
-            string line = await ReadRequiredLineAsync(reader, cancellationToken);
-            if (line.Length == 0)
-            {
-                break;
-            }
-
-            int separator = line.IndexOf(':');
-            if (separator <= 0)
-            {
-                continue;
-            }
-
-            string name = line[..separator].Trim();
-            string value = line[(separator + 1)..].Trim();
-            headers[name] = value;
-        }
 
         int contentLength = 0;
         if (headers.TryGetValue("Content-Length", out string? contentLengthValue)
@@ -631,11 +655,17 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
         string body = string.Empty;
         if (contentLength > 0)
         {
-            char[] bodyBuffer = new char[contentLength];
-            int offset = 0;
+            byte[] bodyBuffer = new byte[contentLength];
+            int copied = Math.Min(bufferedBody.Length, contentLength);
+            if (copied > 0)
+            {
+                Buffer.BlockCopy(bufferedBody, 0, bodyBuffer, 0, copied);
+            }
+
+            int offset = copied;
             while (offset < contentLength)
             {
-                int read = await reader.ReadAsync(bodyBuffer.AsMemory(offset, contentLength - offset), cancellationToken);
+                int read = await stream.ReadAsync(bodyBuffer.AsMemory(offset, contentLength - offset), cancellationToken);
                 if (read == 0)
                 {
                     throw new EndOfStreamException("Unexpected end of stream while reading request body.");
@@ -644,7 +674,7 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
                 offset += read;
             }
 
-            body = new string(bodyBuffer);
+            body = Encoding.UTF8.GetString(bodyBuffer);
         }
 
         string path = rawTarget;
@@ -659,10 +689,76 @@ internal sealed class DockerApiServer(IDockerApiBackend backendService, DockerAp
         return new DockerApiRequest("npipe", pipeName, method, NormalizePath(path), ParseQueryParameters(queryString), body);
     }
 
-    private static async Task<string> ReadRequiredLineAsync(StreamReader reader, CancellationToken cancellationToken)
+    private static async Task<(string RequestLine, Dictionary<string, string> Headers, byte[] BufferedBody)> ReadPipeHeadersAsync(Stream stream, CancellationToken cancellationToken)
     {
-        string? line = await reader.ReadLineAsync(cancellationToken);
-        return line ?? throw new EndOfStreamException("Unexpected end of stream while reading HTTP headers.");
+        byte[] headerTerminator = "\r\n\r\n"u8.ToArray();
+        var buffer = new List<byte>(4096);
+        var readBuffer = new byte[1024];
+
+        while (true)
+        {
+            int read = await stream.ReadAsync(readBuffer, cancellationToken);
+            if (read == 0)
+            {
+                throw new EndOfStreamException("Unexpected end of stream while reading HTTP headers.");
+            }
+
+            buffer.AddRange(readBuffer.AsSpan(0, read).ToArray());
+            int headerEndIndex = IndexOfSequence(buffer.ToArray(), headerTerminator);
+            if (headerEndIndex >= 0)
+            {
+                byte[] allBytes = buffer.ToArray();
+                string headerText = Encoding.ASCII.GetString(allBytes, 0, headerEndIndex);
+                string[] lines = headerText.Split("\r\n", StringSplitOptions.None);
+                if (lines.Length == 0 || string.IsNullOrWhiteSpace(lines[0]))
+                {
+                    throw new InvalidOperationException("Invalid HTTP request line.");
+                }
+
+                var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string line in lines.Skip(1))
+                {
+                    if (line.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    int separator = line.IndexOf(':');
+                    if (separator <= 0)
+                    {
+                        continue;
+                    }
+
+                    string name = line[..separator].Trim();
+                    string value = line[(separator + 1)..].Trim();
+                    headers[name] = value;
+                }
+
+                int bodyOffset = headerEndIndex + headerTerminator.Length;
+                byte[] bufferedBody = bodyOffset < allBytes.Length
+                    ? allBytes[bodyOffset..]
+                    : [];
+                return (lines[0], headers, bufferedBody);
+            }
+        }
+    }
+
+    private static int IndexOfSequence(ReadOnlySpan<byte> source, ReadOnlySpan<byte> value)
+    {
+        if (value.Length == 0 || source.Length < value.Length)
+        {
+            return -1;
+        }
+
+        for (int index = 0; index <= source.Length - value.Length; index++)
+        {
+            if (source.Slice(index, value.Length).SequenceEqual(value))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static Task WriteHttpResponseAsync(HttpListenerResponse response, DockerApiResponse payload, CancellationToken cancellationToken)
