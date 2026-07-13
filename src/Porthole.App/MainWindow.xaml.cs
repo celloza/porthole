@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Title = ViewModel.WindowTitle;
         NavFrame.Navigate(typeof(HomePage));
         _ = InitializeShellAsync();
+        Closed += (_, _) => ViewModel.Cleanup();
         App.TraceStartup($"MainWindow HWND {WindowNative.GetWindowHandle(this)}");
         App.TraceStartup("MainWindow ctor complete");
     }
