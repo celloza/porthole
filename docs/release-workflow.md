@@ -16,9 +16,8 @@ This document explains how Porthole publishes MSI installer releases using GitHu
    - `sha256.txt`
 4. Uploads artifacts to the workflow run.
 5. Creates or updates a GitHub Release and attaches the MSI + hash file.
-6. Uses `wingetcreate update --out ...` against the published MSI URL to generate an updated WinGet manifest set in CI.
-7. Validates the generated manifest directory with `winget validate --manifest`.
-8. Submits that generated manifest directory to `microsoft/winget-pkgs`.
+6. Verifies each installer URL is available on the GitHub Release (retries up to 12 times).
+7. Runs `wingetcreate update --urls <url|arch> ... --submit` to generate an updated WinGet manifest and submit it directly to `microsoft/winget-pkgs`.
 
 Notes:
 - Package file names are derived from the release tag and architecture (example: `v0.2.0-rc.1` -> `Porthole-v0.2.0-rc.1-x64.msi` and `Porthole-v0.2.0-rc.1-arm64.msi`).
