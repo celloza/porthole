@@ -25,6 +25,9 @@ concurrency:
   group: release-installer-${{ github.event.release.tag_name || github.ref_name || inputs.tag }}
   cancel-in-progress: false
 
+env:
+  RELEASE_ARCHITECTURES_JSON: '["x64","arm64"]'
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -116,7 +119,7 @@ jobs:
       - name: Build MSI
         shell: pwsh
         run: |
-          $architectures = @("x64", "arm64")
+          $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
 
           foreach ($platform in $architectures) {
             $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
@@ -132,7 +135,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $hashLines = @()
-          $architectures = @("x64", "arm64")
+          $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
 
           foreach ($platform in $architectures) {
             $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
@@ -207,12 +210,20 @@ jobs:
 
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
-          $installerUrlsByArchitecture = @{
-            x64 = "${{ steps.winget.outputs.installer_url_x64 }}"
-            arm64 = "${{ steps.winget.outputs.installer_url_arm64 }}"
+          $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
+          $installerUrlsByArchitecture = @{}
+
+          foreach ($architecture in $architectures) {
+            switch ($architecture) {
+              "x64" { $installerUrlsByArchitecture[$architecture] = "${{ steps.winget.outputs.installer_url_x64 }}" }
+              "arm64" { $installerUrlsByArchitecture[$architecture] = "${{ steps.winget.outputs.installer_url_arm64 }}" }
+              default { throw "Unsupported release architecture '$architecture'." }
+            }
           }
 
-          foreach ($installerUrl in $installerUrlsByArchitecture.Values) {
+          foreach ($architecture in $architectures) {
+            $installerUrl = $installerUrlsByArchitecture[$architecture]
+
             # Verify installer is available
             for ($attempt = 1; $attempt -le 12; $attempt++) {
               try {
@@ -226,7 +237,7 @@ jobs:
             }
           }
 
-          $wingetUrls = foreach ($architecture in @("x64", "arm64")) {
+          $wingetUrls = foreach ($architecture in $architectures) {
             "$($installerUrlsByArchitecture[$architecture])|$architecture"
           }
 
