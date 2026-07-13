@@ -32,6 +32,11 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         "DevContainers",
         "containers.json");
 
+    private static readonly string SessionRegistryPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Porthole",
+        "sessions.json");
+
     private readonly object _syncLock = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _sessionSettings = new(StringComparer.OrdinalIgnoreCase); // name -> storagePath
@@ -40,7 +45,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
 
     public WslcBackendService()
     {
-        EnsureSessionInitialized(DefaultActiveSessionName);
+        InitializeFromRegistry();
     }
 
     public IReadOnlyList<SessionSummary> ListSessions()
@@ -62,6 +67,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         lock (_syncLock)
         {
             EnsureSessionInitialized(name);
+            SaveRegistryLocked();
         }
     }
 
@@ -77,10 +83,12 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             if (_sessions.TryGetValue(name, out Session? session))
             {
                 _sessions.Remove(name);
-                _sessionSettings.Remove(name);
                 try { session.Terminate(); } catch { }
                 session.Dispose();
             }
+
+            _sessionSettings.Remove(name);
+            SaveRegistryLocked();
         }
     }
 
@@ -90,6 +98,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         {
             EnsureSessionInitialized(name);
             _activeSessionName = name;
+            SaveRegistryLocked();
         }
     }
 
@@ -1167,6 +1176,108 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         _sessionSettings[normalizedName] = settings.StoragePath;
     }
 
+    private void InitializeFromRegistry()
+    {
+        lock (_syncLock)
+        {
+            SessionRegistry? registry = TryLoadRegistryLocked();
+            if (registry is { KnownSessionNames.Count: > 0 }
+                && !string.IsNullOrWhiteSpace(registry.ActiveSessionName))
+            {
+                foreach (string name in registry.KnownSessionNames.Where(n => !string.IsNullOrWhiteSpace(n)))
+                {
+                    _sessionSettings[name] = GetSessionStoragePath(name);
+                }
+
+                _activeSessionName = registry.ActiveSessionName;
+                EnsureSessionInitialized(_activeSessionName);
+                return;
+            }
+
+            // First run or migration: discover existing sessions from the filesystem.
+            var discoveredNames = new List<string>();
+            if (Directory.Exists(BaseStoragePath))
+            {
+                foreach (string directory in Directory.EnumerateDirectories(BaseStoragePath))
+                {
+                    string? name = Path.GetFileName(directory);
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        discoveredNames.Add(name);
+                    }
+                }
+            }
+
+            if (discoveredNames.Count > 0)
+            {
+                // Migration path: register all discovered sessions and prefer any
+                // pre-existing session over the new default to avoid the regression
+                // where all existing containers appear to vanish after an upgrade.
+                var ordered = discoveredNames
+                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                foreach (string name in ordered)
+                {
+                    _sessionSettings[name] = GetSessionStoragePath(name);
+                }
+
+                _activeSessionName = ordered.FirstOrDefault(
+                    n => !n.Equals(DefaultActiveSessionName, StringComparison.OrdinalIgnoreCase))
+                    ?? ordered[0];
+            }
+            else
+            {
+                // Fresh install: create the default session.
+                _sessionSettings[DefaultActiveSessionName] = GetSessionStoragePath(DefaultActiveSessionName);
+                _activeSessionName = DefaultActiveSessionName;
+            }
+
+            EnsureSessionInitialized(_activeSessionName);
+            SaveRegistryLocked();
+        }
+    }
+
+    private SessionRegistry? TryLoadRegistryLocked()
+    {
+        if (!File.Exists(SessionRegistryPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(SessionRegistryPath);
+            return JsonSerializer.Deserialize<SessionRegistry>(json, JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void SaveRegistryLocked()
+    {
+        try
+        {
+            string? registryDir = Path.GetDirectoryName(SessionRegistryPath);
+            if (registryDir is not null)
+            {
+                Directory.CreateDirectory(registryDir);
+            }
+
+            var registry = new SessionRegistry(
+                _activeSessionName,
+                _sessionSettings.Keys.ToArray());
+            string json = JsonSerializer.Serialize(registry, JsonOptions);
+            File.WriteAllText(SessionRegistryPath, json);
+        }
+        catch
+        {
+            // Best-effort persistence; don't crash the service if the file cannot be written.
+        }
+    }
+
     private static void StartSessionIfNeeded(Session session)
     {
         try
@@ -1184,28 +1295,13 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (string name in _sessions.Keys)
-        {
-            names.Add(name);
-        }
-
         foreach (string name in _sessionSettings.Keys)
         {
             names.Add(name);
         }
 
-        if (Directory.Exists(BaseStoragePath))
-        {
-            foreach (string directory in Directory.EnumerateDirectories(BaseStoragePath))
-            {
-                string? name = Path.GetFileName(directory);
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    names.Add(name);
-                }
-            }
-        }
-
+        // Always include the active session name so it is visible even before
+        // EnsureSessionInitialized has added it to _sessionSettings.
         names.Add(_activeSessionName);
         return names;
     }
@@ -1775,6 +1871,10 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     private sealed record VolumeUsageData(long? Size, int? RefCount);
 
     private sealed record VolumeListItem(string? Name, string? Driver, string? Mountpoint, VolumeUsageData? UsageData);
+
+    private sealed record SessionRegistry(
+        string ActiveSessionName,
+        IReadOnlyList<string> KnownSessionNames);
 
     private static DateTimeOffset FromUnixTimeSecondsOrNow(long unixSeconds)
     {
