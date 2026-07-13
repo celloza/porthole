@@ -1224,6 +1224,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
 
                 _activeSessionName = ordered.FirstOrDefault(
                     n => !n.Equals(DefaultActiveSessionName, StringComparison.OrdinalIgnoreCase))
+                    // ordered is non-empty (discoveredNames.Count > 0 was checked above).
                     ?? ordered[0];
             }
             else
@@ -1250,8 +1251,9 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             string json = File.ReadAllText(SessionRegistryPath);
             return JsonSerializer.Deserialize<SessionRegistry>(json, JsonOptions);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[WslcBackendService] Failed to load session registry from '{SessionRegistryPath}': {ex.Message}");
             return null;
         }
     }
@@ -1272,9 +1274,10 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             string json = JsonSerializer.Serialize(registry, JsonOptions);
             File.WriteAllText(SessionRegistryPath, json);
         }
-        catch
+        catch (Exception ex)
         {
             // Best-effort persistence; don't crash the service if the file cannot be written.
+            System.Diagnostics.Debug.WriteLine($"[WslcBackendService] Failed to save session registry to '{SessionRegistryPath}': {ex.Message}");
         }
     }
 
