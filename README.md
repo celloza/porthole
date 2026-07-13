@@ -396,6 +396,8 @@ Porthole includes a WiX v4 installer project intended for winget-friendly distri
 
 ```powershell
 dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=1.0.0 -p:Platform=x64
+# or
+dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=1.0.0 -p:Platform=arm64
 ```
 
 What this does:
