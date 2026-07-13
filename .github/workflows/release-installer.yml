@@ -194,14 +194,7 @@ jobs:
         id: winget
         shell: pwsh
         run: |
-          $tag = "${{ needs.build-and-release.outputs.tag }}"
-          $installerUrlX64 = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
-          $installerUrlArm64 = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-arm64.msi"
-          $packageIdentifier = "celloza.Porthole"
-
-          "installer_url_x64=$installerUrlX64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "installer_url_arm64=$installerUrlArm64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "package_identifier=celloza.Porthole" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Submit to WinGet
         shell: pwsh
@@ -216,22 +209,13 @@ jobs:
 
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
+          $tag = "${{ needs.build-and-release.outputs.tag }}"
           $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
-          $installerUrlsByArchitecture = @{}
           $wingetUrls = @()
 
           foreach ($architecture in $architectures) {
-            switch ($architecture) {
-              "x64" { $installerUrlsByArchitecture[$architecture] = "${{ steps.winget.outputs.installer_url_x64 }}" }
-              "arm64" { $installerUrlsByArchitecture[$architecture] = "${{ steps.winget.outputs.installer_url_arm64 }}" }
-              default { throw "Unsupported release architecture '$architecture'." }
-            }
-
-            $wingetUrls += "$($installerUrlsByArchitecture[$architecture])|$architecture"
-          }
-
-          foreach ($architecture in $architectures) {
-            $installerUrl = $installerUrlsByArchitecture[$architecture]
+            $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-$architecture.msi"
+            $wingetUrls += "$installerUrl|$architecture"
 
             # Verify installer is available
             for ($attempt = 1; $attempt -le 12; $attempt++) {
