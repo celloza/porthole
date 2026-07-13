@@ -143,9 +143,9 @@ jobs:
           $hashLines = @()
           $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
 
-          foreach ($platform in $architectures) {
-            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
-            $msi = "src/Porthole.Installer/bin/$platform/Release/$packageBaseName.msi"
+          foreach ($architecture in $architectures) {
+            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$architecture"
+            $msi = "src/Porthole.Installer/bin/$architecture/Release/$packageBaseName.msi"
 
             if (-not (Test-Path -LiteralPath $msi)) {
               Write-Error "MSI not found: $msi"
