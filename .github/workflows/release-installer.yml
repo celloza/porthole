@@ -116,10 +116,15 @@ jobs:
       - name: Build MSI
         shell: pwsh
         run: |
-          foreach ($platform in @("x64", "arm64")) {
-            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
+          $architectures = @("x64", "arm64")
 
+          foreach ($platform in $architectures) {
+            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
             dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=$packageBaseName -p:Platform=$platform
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "MSI build failed for architecture '$platform'."
+            }
           }
 
       - name: Prepare release assets
@@ -127,8 +132,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $hashLines = @()
+          $architectures = @("x64", "arm64")
 
-          foreach ($platform in @("x64", "arm64")) {
+          foreach ($platform in $architectures) {
             $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
             $msi = "src/Porthole.Installer/bin/$platform/Release/$packageBaseName.msi"
 
@@ -201,12 +207,12 @@ jobs:
 
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
-          $installerUrls = @(
-            "${{ steps.winget.outputs.installer_url_x64 }}",
-            "${{ steps.winget.outputs.installer_url_arm64 }}"
-          )
+          $installerUrlsByArchitecture = @{
+            x64 = "${{ steps.winget.outputs.installer_url_x64 }}"
+            arm64 = "${{ steps.winget.outputs.installer_url_arm64 }}"
+          }
 
-          foreach ($installerUrl in $installerUrls) {
+          foreach ($installerUrl in $installerUrlsByArchitecture.Values) {
             # Verify installer is available
             for ($attempt = 1; $attempt -le 12; $attempt++) {
               try {
@@ -220,10 +226,9 @@ jobs:
             }
           }
 
-          $wingetUrls = @(
-            "$($installerUrls[0])|x64",
-            "$($installerUrls[1])|arm64"
-          )
+          $wingetUrls = foreach ($architecture in @("x64", "arm64")) {
+            "$($installerUrlsByArchitecture[$architecture])|$architecture"
+          }
 
           # Update existing package and submit to WinGet
           wingetcreate update $packageIdentifier `
