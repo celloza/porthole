@@ -1213,6 +1213,8 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
                 // Migration path: register all discovered sessions and prefer any
                 // pre-existing session over the new default to avoid the regression
                 // where all existing containers appear to vanish after an upgrade.
+                // discoveredNames only contains non-null/whitespace names (filtered above),
+                // so ordered will also be non-empty.
                 var ordered = discoveredNames
                     .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -1224,8 +1226,8 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
 
                 _activeSessionName = ordered.FirstOrDefault(
                     n => !n.Equals(DefaultActiveSessionName, StringComparison.OrdinalIgnoreCase))
-                    // ordered is non-empty (discoveredNames.Count > 0 was checked above).
-                    ?? ordered[0];
+                    ?? ordered.FirstOrDefault()
+                    ?? DefaultActiveSessionName;
             }
             else
             {
@@ -1270,7 +1272,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
 
             var registry = new SessionRegistry(
                 _activeSessionName,
-                _sessionSettings.Keys.ToArray());
+                _sessionSettings.Keys.Where(n => !string.IsNullOrWhiteSpace(n)).ToArray());
             string json = JsonSerializer.Serialize(registry, JsonOptions);
             File.WriteAllText(SessionRegistryPath, json);
         }
