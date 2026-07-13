@@ -123,7 +123,13 @@ jobs:
 
           foreach ($architecture in $architectures) {
             $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$architecture"
-            dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=$packageBaseName -p:Platform=$architecture
+            dotnet build src/Porthole.Installer/Porthole.Installer.wixproj `
+              -c Release `
+              -p:ProductVersion=${{ steps.meta.outputs.msi_version }} `
+              -p:AppVersion=${{ steps.meta.outputs.msi_version }} `
+              -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} `
+              -p:OutputName=$packageBaseName `
+              -p:Platform=$architecture
 
             if ($LASTEXITCODE -ne 0) {
               throw "MSI build failed for architecture '$architecture'."
@@ -234,7 +240,9 @@ jobs:
                 break
               }
               catch {
-                if ($attempt -eq 12) { throw }
+                if ($attempt -eq 12) {
+                  throw "Installer for architecture '$architecture' was not available at '$installerUrl' after 12 attempts."
+                }
                 Start-Sleep -Seconds 10
               }
             }
