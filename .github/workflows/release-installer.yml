@@ -121,12 +121,12 @@ jobs:
         run: |
           $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
 
-          foreach ($platform in $architectures) {
-            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
-            dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=$packageBaseName -p:Platform=$platform
+          foreach ($architecture in $architectures) {
+            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$architecture"
+            dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=$packageBaseName -p:Platform=$architecture
 
             if ($LASTEXITCODE -ne 0) {
-              throw "MSI build failed for architecture '$platform'."
+              throw "MSI build failed for architecture '$architecture'."
             }
           }
 
@@ -212,6 +212,7 @@ jobs:
           $version = "${{ needs.build-and-release.outputs.version }}"
           $architectures = ConvertFrom-Json '${{ env.RELEASE_ARCHITECTURES_JSON }}'
           $installerUrlsByArchitecture = @{}
+          $wingetUrls = @()
 
           foreach ($architecture in $architectures) {
             switch ($architecture) {
@@ -219,6 +220,8 @@ jobs:
               "arm64" { $installerUrlsByArchitecture[$architecture] = "${{ steps.winget.outputs.installer_url_arm64 }}" }
               default { throw "Unsupported release architecture '$architecture'." }
             }
+
+            $wingetUrls += "$($installerUrlsByArchitecture[$architecture])|$architecture"
           }
 
           foreach ($architecture in $architectures) {
@@ -235,10 +238,6 @@ jobs:
                 Start-Sleep -Seconds 10
               }
             }
-          }
-
-          $wingetUrls = foreach ($architecture in $architectures) {
-            "$($installerUrlsByArchitecture[$architecture])|$architecture"
           }
 
           # Update existing package and submit to WinGet
