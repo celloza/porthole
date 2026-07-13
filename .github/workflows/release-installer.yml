@@ -201,14 +201,12 @@ jobs:
 
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
-          $urls = @(
-            "${{ steps.winget.outputs.installer_url_x64 }}|x64",
-            "${{ steps.winget.outputs.installer_url_arm64 }}|arm64"
+          $installerUrls = @(
+            "${{ steps.winget.outputs.installer_url_x64 }}",
+            "${{ steps.winget.outputs.installer_url_arm64 }}"
           )
 
-          foreach ($urlEntry in $urls) {
-            $installerUrl = $urlEntry.Split('|')[0]
-
+          foreach ($installerUrl in $installerUrls) {
             # Verify installer is available
             for ($attempt = 1; $attempt -le 12; $attempt++) {
               try {
@@ -222,9 +220,14 @@ jobs:
             }
           }
 
+          $wingetUrls = @(
+            "$($installerUrls[0])|x64",
+            "$($installerUrls[1])|arm64"
+          )
+
           # Update existing package and submit to WinGet
           wingetcreate update $packageIdentifier `
             --version $version `
             --token $env:WINGETCREATE_TOKEN `
-            --urls $urls `
+            --urls $wingetUrls `
             --submit
