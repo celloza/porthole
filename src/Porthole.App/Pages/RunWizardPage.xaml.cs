@@ -32,6 +32,7 @@ public sealed partial class RunWizardPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadImagesAsync();
+        await ViewModel.LoadActiveSessionNameAsync();
         ViewModel.Reset();
     }
 

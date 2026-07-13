@@ -147,6 +147,18 @@
                         Spacing="16"
                         Visibility="{x:Bind GetStepVisibility(ViewModel.IsStepOneActive), Mode=OneWay}">
 
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="SemiBold"
+                                Opacity="0.5"
+                                Text="ACTIVE SESSION" />
+                            <TextBlock
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind ViewModel.ActiveSessionName, Mode=OneWay}" />
+                        </StackPanel>
+
                         <StackPanel Spacing="6">
                             <TextBlock
                                 FontSize="10"

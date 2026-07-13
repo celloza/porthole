@@ -17,6 +17,7 @@ public partial class RunWizardViewModel : ObservableObject
 
     private readonly IImageCatalogService _imageCatalogService;
     private readonly IContainerCatalogService _containerCatalogService;
+    private readonly ISessionService _sessionService;
 
     // Step tracking
     [ObservableProperty]
@@ -80,15 +81,19 @@ public partial class RunWizardViewModel : ObservableObject
     [ObservableProperty]
     private string createdContainerId = string.Empty;
 
+    [ObservableProperty]
+    private string activeSessionName = string.Empty;
+
     public ObservableCollection<ImageSummary> AvailableImages { get; } = [];
     public ObservableCollection<string> PortMappings { get; } = [];
     public ObservableCollection<string> EnvironmentVariables { get; } = [];
     public ObservableCollection<string> VolumeMounts { get; } = [];
 
-    public RunWizardViewModel(IImageCatalogService imageCatalogService, IContainerCatalogService containerCatalogService)
+    public RunWizardViewModel(IImageCatalogService imageCatalogService, IContainerCatalogService containerCatalogService, ISessionService sessionService)
     {
         _imageCatalogService = imageCatalogService;
         _containerCatalogService = containerCatalogService;
+        _sessionService = sessionService;
     }
 
     public bool IsStepOneActive => CurrentStep == 1;
@@ -190,6 +195,19 @@ public partial class RunWizardViewModel : ObservableObject
         finally
         {
             IsLoadingImages = false;
+        }
+    }
+
+    public async Task LoadActiveSessionNameAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            string activeName = await _sessionService.GetActiveSessionNameAsync(cancellationToken);
+            ActiveSessionName = activeName;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load active session: {ex.Message}";
         }
     }
 

@@ -44,9 +44,25 @@ public partial class ShellViewModel : ObservableObject
     {
         _sessionService = sessionService;
         Sessions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSessions));
+        _sessionService.SessionsChanged += OnSessionsChanged;
     }
 
-    public Task InitializeAsync(CancellationToken cancellationToken = default) => LoadSessionsCoreAsync(cancellationToken);
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        _sessionService.StartWatchingForChanges(cancellationToken);
+        return LoadSessionsCoreAsync(cancellationToken);
+    }
+
+    public void Cleanup()
+    {
+        _sessionService.StopWatchingForChanges();
+        _sessionService.SessionsChanged -= OnSessionsChanged;
+    }
+
+    private void OnSessionsChanged(object? sender, EventArgs e)
+    {
+        _ = LoadSessionsCoreAsync(CancellationToken.None, suppressLoadingState: true);
+    }
 
     public void SetSection(string sectionTitle)
     {

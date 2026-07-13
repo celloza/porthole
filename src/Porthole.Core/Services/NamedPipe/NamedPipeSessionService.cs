@@ -4,6 +4,12 @@ namespace Porthole.Core.Services.NamedPipe;
 
 public sealed class NamedPipeSessionService : ISessionService
 {
+    private CancellationTokenSource? _watchCancellationTokenSource;
+    private Task? _watchTask;
+    private IReadOnlyList<SessionSummary> _lastKnownSessions = [];
+
+    public event EventHandler? SessionsChanged;
+
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(CancellationToken cancellationToken = default)
     {
         var response = await NamedPipeImageCatalogService.SendRequestAsync(
@@ -20,6 +26,8 @@ public sealed class NamedPipeSessionService : ISessionService
             new ImageCatalogRequest(ImageCatalogOperation.CreateSession, SessionName: name),
             progress: null,
             cancellationToken);
+
+        OnSessionsChanged();
     }
 
     public async Task DeleteSessionAsync(string name, CancellationToken cancellationToken = default)
@@ -28,6 +36,8 @@ public sealed class NamedPipeSessionService : ISessionService
             new ImageCatalogRequest(ImageCatalogOperation.DeleteSession, SessionName: name),
             progress: null,
             cancellationToken);
+
+        OnSessionsChanged();
     }
 
     public async Task SetActiveSessionAsync(string name, CancellationToken cancellationToken = default)
@@ -36,6 +46,8 @@ public sealed class NamedPipeSessionService : ISessionService
             new ImageCatalogRequest(ImageCatalogOperation.SetActiveSession, SessionName: name),
             progress: null,
             cancellationToken);
+
+        OnSessionsChanged();
     }
 
     public async Task<string> GetActiveSessionNameAsync(CancellationToken cancellationToken = default)
@@ -46,5 +58,69 @@ public sealed class NamedPipeSessionService : ISessionService
             cancellationToken);
 
         return response.Message ?? string.Empty;
+    }
+
+    public void StartWatchingForChanges(CancellationToken cancellationToken = default)
+    {
+        if (_watchTask is not null && !_watchTask.IsCompleted)
+            return; // Already watching
+
+        _watchCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _watchTask = WatchForChangesAsync(_watchCancellationTokenSource.Token);
+    }
+
+    public void StopWatchingForChanges()
+    {
+        _watchCancellationTokenSource?.Cancel();
+        _watchCancellationTokenSource?.Dispose();
+        _watchCancellationTokenSource = null;
+    }
+
+    private async Task WatchForChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(2000, cancellationToken); // Check every 2 seconds
+
+                try
+                {
+                    var currentSessions = await ListSessionsAsync(cancellationToken);
+
+                    // Check if sessions list changed
+                    if (HaveSessionsChanged(currentSessions))
+                    {
+                        _lastKnownSessions = currentSessions;
+                        OnSessionsChanged();
+                    }
+                }
+                catch
+                {
+                    // Silently ignore errors during watch (backend might be unavailable)
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when watch is stopped
+        }
+    }
+
+    private bool HaveSessionsChanged(IReadOnlyList<SessionSummary> newSessions)
+    {
+        if (_lastKnownSessions.Count != newSessions.Count)
+            return true;
+
+        // Check if any session names changed
+        var lastNames = _lastKnownSessions.Select(s => s.Name).OrderBy(n => n).ToList();
+        var newNames = newSessions.Select(s => s.Name).OrderBy(n => n).ToList();
+
+        return !lastNames.SequenceEqual(newNames);
+    }
+
+    private void OnSessionsChanged()
+    {
+        SessionsChanged?.Invoke(this, EventArgs.Empty);
     }
 }
