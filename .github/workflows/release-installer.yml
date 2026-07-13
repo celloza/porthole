@@ -100,7 +100,6 @@ jobs:
             exit 1
           }
 
-          $packageBaseName = "Porthole-$tag-x64"
           $appInformationalVersion = "$version+${{ github.sha }}"
 
           # Auto-detect semver prerelease tags like v1.2.3-rc.1, v1.2.3-beta.2, v1.2.3-alpha
@@ -112,33 +111,40 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "msi_version=$msiVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "app_informational_version=$appInformationalVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "package_base_name=$packageBaseName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Build MSI
         shell: pwsh
         run: |
-          dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=${{ steps.meta.outputs.package_base_name }} -p:Platform=x64
+          foreach ($platform in @("x64", "arm64")) {
+            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
 
-      - name: Prepare release assets
-        id: assets
-        shell: pwsh
-        run: |
-          $packageBaseName = "${{ steps.meta.outputs.package_base_name }}"
-          $msi = "src/Porthole.Installer/bin/x64/Release/$packageBaseName.msi"
-
-          if (-not (Test-Path -LiteralPath $msi)) {
-            Write-Error "MSI not found: $msi"
-            exit 1
+            dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=${{ steps.meta.outputs.msi_version }} -p:AppVersion=${{ steps.meta.outputs.msi_version }} -p:AppInformationalVersion=${{ steps.meta.outputs.app_informational_version }} -p:OutputName=$packageBaseName -p:Platform=$platform
           }
 
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item -LiteralPath $msi -Destination dist
+          $hashLines = @()
 
-          $hash = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path dist (Split-Path $msi -Leaf))
-          "$($hash.Hash)  $($hash.Path | Split-Path -Leaf)" | Set-Content -LiteralPath (Join-Path dist "sha256.txt")
+          foreach ($platform in @("x64", "arm64")) {
+            $packageBaseName = "Porthole-${{ steps.meta.outputs.tag }}-$platform"
+            $msi = "src/Porthole.Installer/bin/$platform/Release/$packageBaseName.msi"
 
-          "msi=$(Resolve-Path -LiteralPath (Join-Path dist (Split-Path $msi -Leaf)))" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            if (-not (Test-Path -LiteralPath $msi)) {
+              Write-Error "MSI not found: $msi"
+              exit 1
+            }
+
+            $destination = Join-Path dist (Split-Path $msi -Leaf)
+            Copy-Item -LiteralPath $msi -Destination $destination
+
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $destination
+            $hashLines += "$($hash.Hash)  $(Split-Path $destination -Leaf)"
+          }
+
+          $hashLines | Set-Content -LiteralPath (Join-Path dist "sha256.txt")
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
@@ -174,10 +180,12 @@ jobs:
         shell: pwsh
         run: |
           $tag = "${{ needs.build-and-release.outputs.tag }}"
-          $installerUrl = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
+          $installerUrlX64 = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-x64.msi"
+          $installerUrlArm64 = "https://github.com/celloza/porthole/releases/download/$tag/Porthole-$tag-arm64.msi"
           $packageIdentifier = "celloza.Porthole"
 
-          "installer_url=$installerUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "installer_url_x64=$installerUrlX64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "installer_url_arm64=$installerUrlArm64" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "package_identifier=$packageIdentifier" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Submit to WinGet
@@ -191,25 +199,29 @@ jobs:
             Add-AppxPackage -Path $appxBundleFile -ErrorAction Stop
           }
 
-          $installerUrl = "${{ steps.winget.outputs.installer_url }}"
           $packageIdentifier = "${{ steps.winget.outputs.package_identifier }}"
           $version = "${{ needs.build-and-release.outputs.version }}"
-          
-          # Verify installer is available
-          for ($attempt = 1; $attempt -le 12; $attempt++) {
-            try {
-              Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
-              break
-            }
-            catch {
-              if ($attempt -eq 12) { throw }
-              Start-Sleep -Seconds 10
+          $urls = @(
+            "${{ steps.winget.outputs.installer_url_x64 }}|x64",
+            "${{ steps.winget.outputs.installer_url_arm64 }}|arm64"
+          )
+
+          foreach ($urlEntry in $urls) {
+            $installerUrl = $urlEntry.Split('|')[0]
+
+            # Verify installer is available
+            for ($attempt = 1; $attempt -le 12; $attempt++) {
+              try {
+                Invoke-WebRequest -Uri $installerUrl -Method Head -ErrorAction Stop | Out-Null
+                break
+              }
+              catch {
+                if ($attempt -eq 12) { throw }
+                Start-Sleep -Seconds 10
+              }
             }
           }
 
-          # Build URL array with architecture
-          $urls = @("$installerUrl|x64")
-          
           # Update existing package and submit to WinGet
           wingetcreate update $packageIdentifier `
             --version $version `
