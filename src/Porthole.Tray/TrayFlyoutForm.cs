@@ -412,80 +412,53 @@ internal sealed class TrayFlyoutForm : Form
         // Action buttons row
         int buttonY = 62;
         int buttonH = 28;
+        const int ButtonGap = 4;
 
         if (snapshot.IsActive)
         {
             // Active session: Pause/Resume + Terminate (no Set Active needed).
+            const int primaryLeft = 10;
+            const int primaryWidth = 88;
+            const int terminateLeft2 = primaryLeft + primaryWidth + ButtonGap;
+            const int terminateWidth2 = 104;
+
             if (isRunning)
             {
-                var pauseBtn = CreateActionButton("⏸ Pause", StoppedColor, buttonY, 10, 88, buttonH);
+                var pauseBtn = CreateActionButton("⏸ Pause", StoppedColor, buttonY, primaryLeft, primaryWidth, buttonH);
                 pauseBtn.Click += (_, _) => RunAction(() => _backendService.PauseSession(snapshot.Name));
-
-                var terminateBtn = CreateActionButton("⏹ Terminate", DangerColor, buttonY, 104, 104, buttonH);
-                terminateBtn.Click += (_, _) =>
-                {
-                    if (ConfirmTerminate(snapshot.Name))
-                    {
-                        RunAction(() => _backendService.TerminateNamedSession(snapshot.Name));
-                    }
-                };
-
-                card.Controls.AddRange([pauseBtn, terminateBtn]);
+                card.Controls.AddRange([pauseBtn, CreateTerminateButton(snapshot.Name, buttonY, terminateLeft2, terminateWidth2, buttonH)]);
             }
             else
             {
-                var resumeBtn = CreateActionButton("▶ Resume", RunningColor, buttonY, 10, 88, buttonH);
+                var resumeBtn = CreateActionButton("▶ Resume", RunningColor, buttonY, primaryLeft, primaryWidth, buttonH);
                 resumeBtn.Click += (_, _) => RunAction(() => _backendService.ResumeSession(snapshot.Name));
-
-                var terminateBtn = CreateActionButton("⏹ Terminate", DangerColor, buttonY, 104, 104, buttonH);
-                terminateBtn.Click += (_, _) =>
-                {
-                    if (ConfirmTerminate(snapshot.Name))
-                    {
-                        RunAction(() => _backendService.TerminateNamedSession(snapshot.Name));
-                    }
-                };
-
-                card.Controls.AddRange([resumeBtn, terminateBtn]);
+                card.Controls.AddRange([resumeBtn, CreateTerminateButton(snapshot.Name, buttonY, terminateLeft2, terminateWidth2, buttonH)]);
             }
         }
         else
         {
             // Inactive session: Set Active + Pause/Resume + Terminate (three-button row).
-            var setActiveBtn = CreateActionButton("⊙ Set Active", AccentColor, buttonY, 10, 82, buttonH);
+            const int setActiveLeft = 10;
+            const int setActiveWidth = 82;
+            const int secondaryLeft = setActiveLeft + setActiveWidth + ButtonGap;
+            const int secondaryWidth = 82;
+            const int terminateLeft3 = secondaryLeft + secondaryWidth + ButtonGap;
+            const int terminateWidth3 = 104;
+
+            var setActiveBtn = CreateActionButton("⊙ Set Active", AccentColor, buttonY, setActiveLeft, setActiveWidth, buttonH);
             setActiveBtn.Click += (_, _) => RunAction(() => _backendService.SetActiveSession(snapshot.Name));
 
             if (isRunning)
             {
-                var pauseBtn = CreateActionButton("⏸ Pause", StoppedColor, buttonY, 96, 82, buttonH);
+                var pauseBtn = CreateActionButton("⏸ Pause", StoppedColor, buttonY, secondaryLeft, secondaryWidth, buttonH);
                 pauseBtn.Click += (_, _) => RunAction(() => _backendService.PauseSession(snapshot.Name));
-
-                var terminateBtn = CreateActionButton("⏹ Terminate", DangerColor, buttonY, 182, 104, buttonH);
-                terminateBtn.Click += (_, _) =>
-                {
-                    if (ConfirmTerminate(snapshot.Name))
-                    {
-                        RunAction(() => _backendService.TerminateNamedSession(snapshot.Name));
-                    }
-                };
-
-                card.Controls.AddRange([setActiveBtn, pauseBtn, terminateBtn]);
+                card.Controls.AddRange([setActiveBtn, pauseBtn, CreateTerminateButton(snapshot.Name, buttonY, terminateLeft3, terminateWidth3, buttonH)]);
             }
             else
             {
-                var resumeBtn = CreateActionButton("▶ Resume", RunningColor, buttonY, 96, 82, buttonH);
+                var resumeBtn = CreateActionButton("▶ Resume", RunningColor, buttonY, secondaryLeft, secondaryWidth, buttonH);
                 resumeBtn.Click += (_, _) => RunAction(() => _backendService.ResumeSession(snapshot.Name));
-
-                var terminateBtn = CreateActionButton("⏹ Terminate", DangerColor, buttonY, 182, 104, buttonH);
-                terminateBtn.Click += (_, _) =>
-                {
-                    if (ConfirmTerminate(snapshot.Name))
-                    {
-                        RunAction(() => _backendService.TerminateNamedSession(snapshot.Name));
-                    }
-                };
-
-                card.Controls.AddRange([setActiveBtn, resumeBtn, terminateBtn]);
+                card.Controls.AddRange([setActiveBtn, resumeBtn, CreateTerminateButton(snapshot.Name, buttonY, terminateLeft3, terminateWidth3, buttonH)]);
             }
         }
 
@@ -531,6 +504,19 @@ internal sealed class TrayFlyoutForm : Form
         };
         btn.FlatAppearance.BorderSize = 0;
         btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(70, 70, 70);
+        return btn;
+    }
+
+    private Button CreateTerminateButton(string sessionName, int top, int left, int width, int height)
+    {
+        var btn = CreateActionButton("⏹ Terminate", DangerColor, top, left, width, height);
+        btn.Click += (_, _) =>
+        {
+            if (ConfirmTerminate(sessionName))
+            {
+                RunAction(() => _backendService.TerminateNamedSession(sessionName));
+            }
+        };
         return btn;
     }
 
