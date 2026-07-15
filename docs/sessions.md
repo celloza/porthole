@@ -87,6 +87,21 @@ The active session determines which session receives all container, image, and v
 2. Click the session selector in the session toolbar
 3. Open the Sessions page and click on a session to make it active
 
+### Quick Switch from Tray Flyout
+
+For faster day-to-day switching, you can use the tray flyout without opening the full dashboard.
+
+**How to open:**
+- Left-click or right-click the Porthole tray icon
+
+**What you can do:**
+- View all known sessions and their current status
+- Set any session as active
+- Pause, resume, or terminate sessions directly from the flyout
+- Open the full dashboard for deeper management
+
+![Tray flyout quick switch panel](../assets/flyout.png)
+
 ### Deleting a Session
 
 Deleting a session removes:

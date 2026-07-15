@@ -57,7 +57,7 @@ internal static class Program
 
 		private void OnNotifyIconMouseClick(object? sender, MouseEventArgs e)
 		{
-			if (e.Button != MouseButtons.Left)
+			if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right)
 			{
 				return;
 			}

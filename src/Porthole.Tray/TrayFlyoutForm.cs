@@ -26,6 +26,7 @@ internal sealed class TrayFlyoutForm : Form
     private static readonly Color TextPrimary = Color.FromArgb(242, 242, 242);
     private static readonly Color TextSecondary = Color.FromArgb(160, 160, 160);
     private static readonly Color SeparatorColor = Color.FromArgb(55, 55, 55);
+    private static readonly Color UtilityPanelColor = Color.FromArgb(24, 24, 24);
 
     private const int FlyoutWidth = 330;
     private const int HeaderHeight = 48;
@@ -80,7 +81,7 @@ internal sealed class TrayFlyoutForm : Form
         _headerLabel = new Label
         {
             Text = "Sessions",
-            Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold),
+            Font = new Font("Segoe UI Variable Display", 13f),
             ForeColor = TextPrimary,
             AutoSize = false,
             Width = FlyoutWidth - 60,
@@ -110,14 +111,6 @@ internal sealed class TrayFlyoutForm : Form
 
         header.Controls.AddRange([_headerLabel, closeButton]);
 
-        // ── Separator ───────────────────────────────────────────────────────
-        var topSeparator = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 1,
-            BackColor = SeparatorColor,
-        };
-
         // ── Sessions scroll area ─────────────────────────────────────────────
         _sessionsContainer = new Panel
         {
@@ -127,20 +120,12 @@ internal sealed class TrayFlyoutForm : Form
             Padding = new Padding(CardPadding, CardPadding, CardPadding, 0),
         };
 
-        // ── Bottom separator ─────────────────────────────────────────────────
-        var bottomSeparator = new Panel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 1,
-            BackColor = SeparatorColor,
-        };
-
         // ── Footer ───────────────────────────────────────────────────────────
         var footer = new Panel
         {
             Dock = DockStyle.Bottom,
             Height = FooterHeight,
-            BackColor = BackgroundColor,
+            BackColor = UtilityPanelColor,
             Padding = new Padding(CardPadding, 8, CardPadding, 8),
         };
 
@@ -178,15 +163,15 @@ internal sealed class TrayFlyoutForm : Form
             Margin = new Padding(0),
         };
 
-        var bugButton = CreateIconButton("\uE897", "Report an issue on GitHub");  // Segoe MDL2: Feedback
-        bugButton.Click += (_, _) => OpenUrl("https://github.com/celloza/porthole/issues");
-
         var exitButton = CreateIconButton("\uE7E8", "Exit Porthole");  // Segoe MDL2: Power
         exitButton.Click += (_, _) =>
         {
             Hide();
             _exitTray();
         };
+
+        var bugButton = CreateIconButton("\uE897", "Report an issue on GitHub");  // Segoe MDL2: Feedback
+        bugButton.Click += (_, _) => OpenUrl("https://github.com/celloza/porthole/issues");
 
         utilPanel.Controls.AddRange([bugButton, exitButton]);
 
@@ -195,9 +180,7 @@ internal sealed class TrayFlyoutForm : Form
         footer.Controls.Add(footerTable);
 
         Controls.Add(_sessionsContainer);
-        Controls.Add(bottomSeparator);
         Controls.Add(footer);
-        Controls.Add(topSeparator);
         Controls.Add(header);
 
         ResumeLayout(true);
