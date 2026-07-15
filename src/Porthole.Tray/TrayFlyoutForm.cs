@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -25,7 +26,6 @@ internal sealed class TrayFlyoutForm : Form
     private static readonly Color TextPrimary = Color.FromArgb(242, 242, 242);
     private static readonly Color TextSecondary = Color.FromArgb(160, 160, 160);
     private static readonly Color SeparatorColor = Color.FromArgb(55, 55, 55);
-    private static readonly Color SecondaryButtonColor = Color.FromArgb(55, 55, 55);
 
     private const int FlyoutWidth = 330;
     private const int HeaderHeight = 48;
@@ -38,9 +38,9 @@ internal sealed class TrayFlyoutForm : Form
     private readonly Action _openDashboard;
     private readonly Action _exitTray;
     private readonly System.Windows.Forms.Timer _refreshTimer;
+    private readonly ToolTip _sharedToolTip = new();
     private Panel _sessionsContainer = null!;
     private Label _headerLabel = null!;
-    private Label _sessionCountLabel = null!;
 
     public TrayFlyoutForm(WslcBackendService backendService, Action openDashboard, Action exitTray)
     {
@@ -79,40 +79,27 @@ internal sealed class TrayFlyoutForm : Form
 
         _headerLabel = new Label
         {
-            Text = "Porthole",
-            Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+            Text = "Sessions",
+            Font = new Font("Segoe UI Variable Display", 13f, FontStyle.Bold),
             ForeColor = TextPrimary,
             AutoSize = false,
-            Width = 180,
+            Width = FlyoutWidth - 60,
             Height = HeaderHeight,
             Top = 0,
             Left = CardPadding,
             TextAlign = ContentAlignment.MiddleLeft,
         };
 
-        _sessionCountLabel = new Label
-        {
-            Text = string.Empty,
-            Font = new Font("Segoe UI", 8.5f),
-            ForeColor = TextSecondary,
-            AutoSize = false,
-            Width = 160,
-            Height = HeaderHeight,
-            Top = 0,
-            Left = FlyoutWidth - 170,
-            TextAlign = ContentAlignment.MiddleRight,
-        };
-
         var closeButton = new Button
         {
-            Text = "✕",
-            Font = new Font("Segoe UI", 9f),
+            Text = "\uE711",  // Segoe MDL2 Assets: Cancel / ✗
+            Font = new Font("Segoe MDL2 Assets", 9f),
             ForeColor = TextSecondary,
-            BackColor = BackgroundColor,
+            BackColor = Color.Transparent,
             FlatStyle = FlatStyle.Flat,
-            Width = 36,
-            Height = 36,
-            Top = (HeaderHeight - 36) / 2,
+            Width = 32,
+            Height = 32,
+            Top = (HeaderHeight - 32) / 2,
             Left = FlyoutWidth - 44,
             Cursor = Cursors.Hand,
             TabStop = false,
@@ -121,7 +108,7 @@ internal sealed class TrayFlyoutForm : Form
         closeButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 60, 60);
         closeButton.Click += (_, _) => Hide();
 
-        header.Controls.AddRange([_headerLabel, _sessionCountLabel, closeButton]);
+        header.Controls.AddRange([_headerLabel, closeButton]);
 
         // ── Separator ───────────────────────────────────────────────────────
         var topSeparator = new Panel
@@ -160,15 +147,14 @@ internal sealed class TrayFlyoutForm : Form
         var footerTable = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
+            ColumnCount = 2,
             RowCount = 1,
             BackColor = BackgroundColor,
             Margin = new Padding(0),
             Padding = new Padding(0),
         };
         footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
-        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footerTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var openButton = CreateStyledButton("Open Dashboard", AccentColor, true);
@@ -180,23 +166,32 @@ internal sealed class TrayFlyoutForm : Form
             _openDashboard();
         };
 
-        var closeFooterButton = CreateStyledButton("Close", SecondaryButtonColor, false);
-        closeFooterButton.Dock = DockStyle.Fill;
-        closeFooterButton.Margin = new Padding(0, 0, 6, 0);
-        closeFooterButton.Click += (_, _) => Hide();
+        // Icon-only utility buttons (right side of footer).
+        var utilPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = BackgroundColor,
+            AutoSize = true,
+            Padding = new Padding(0),
+            Margin = new Padding(0),
+        };
 
-        var exitButton = CreateStyledButton("Exit", DangerColor, false);
-        exitButton.Dock = DockStyle.Fill;
-        exitButton.Margin = new Padding(0);
+        var bugButton = CreateIconButton("\uE897", "Report an issue on GitHub");  // Segoe MDL2: Feedback
+        bugButton.Click += (_, _) => OpenUrl("https://github.com/celloza/porthole/issues");
+
+        var exitButton = CreateIconButton("\uE7E8", "Exit Porthole");  // Segoe MDL2: Power
         exitButton.Click += (_, _) =>
         {
             Hide();
             _exitTray();
         };
 
+        utilPanel.Controls.AddRange([bugButton, exitButton]);
+
         footerTable.Controls.Add(openButton, 0, 0);
-        footerTable.Controls.Add(closeFooterButton, 1, 0);
-        footerTable.Controls.Add(exitButton, 2, 0);
+        footerTable.Controls.Add(utilPanel, 1, 0);
         footer.Controls.Add(footerTable);
 
         Controls.Add(_sessionsContainer);
@@ -255,6 +250,7 @@ internal sealed class TrayFlyoutForm : Form
         if (disposing)
         {
             _refreshTimer.Dispose();
+            _sharedToolTip.Dispose();
         }
 
         base.Dispose(disposing);
@@ -330,10 +326,6 @@ internal sealed class TrayFlyoutForm : Form
 
         _sessionsContainer.SuspendLayout();
         _sessionsContainer.Controls.Clear();
-
-        _sessionCountLabel.Text = snapshots.Count == 0
-            ? string.Empty
-            : $"{snapshots.Count} session{(snapshots.Count == 1 ? string.Empty : "s")}";
 
         if (snapshots.Count == 0)
         {
@@ -571,6 +563,41 @@ internal sealed class TrayFlyoutForm : Form
         btn.FlatAppearance.BorderSize = 0;
         btn.FlatAppearance.MouseOverBackColor = ControlPaint.Light(backColor, 0.2f);
         return btn;
+    }
+
+    private Button CreateIconButton(string glyph, string tooltipText)
+    {
+        var btn = new Button
+        {
+            Text = glyph,
+            Font = new Font("Segoe MDL2 Assets", 11f),
+            ForeColor = TextSecondary,
+            BackColor = Color.Transparent,
+            FlatStyle = FlatStyle.Flat,
+            Width = 32,
+            Height = 32,
+            Cursor = Cursors.Hand,
+            TabStop = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Margin = new Padding(2, 0, 2, 0),
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(55, 55, 55);
+        _sharedToolTip.SetToolTip(btn, tooltipText);
+        return btn;
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            // Log for diagnostics but don't surface an error dialog for a non-critical helper action.
+            Debug.WriteLine($"[Porthole] Failed to open URL '{url}': {ex.Message}");
+        }
     }
 
     private void RunAction(Action action)
