@@ -116,7 +116,13 @@ public sealed class NamedPipeSessionService : ISessionService
         var lastNames = _lastKnownSessions.Select(s => s.Name).OrderBy(n => n).ToList();
         var newNames = newSessions.Select(s => s.Name).OrderBy(n => n).ToList();
 
-        return !lastNames.SequenceEqual(newNames);
+        if (!lastNames.SequenceEqual(newNames))
+            return true;
+
+        // Also check if the active session changed (e.g. switched via the tray flyout)
+        string? lastActive = _lastKnownSessions.FirstOrDefault(s => s.IsActive)?.Name;
+        string? newActive = newSessions.FirstOrDefault(s => s.IsActive)?.Name;
+        return !string.Equals(lastActive, newActive, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnSessionsChanged()

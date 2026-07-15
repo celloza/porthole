@@ -29,7 +29,6 @@ internal static class Program
 		private readonly DockerApiServer _dockerApiServer;
 		private readonly NamedPipeImageCatalogServer _imageServer;
 		private readonly WslcBackendService _backendService;
-		private readonly ContextMenuStrip _menu;
 		private readonly NotifyIcon _notifyIcon;
 		private TrayFlyoutForm? _flyout;
 
@@ -43,18 +42,12 @@ internal static class Program
 			_imageServer.Start();
 			_dockerApiServer.Start();
 
-			_menu = new ContextMenuStrip();
-			_menu.Items.Add("Open dashboard", null, (_, _) => LaunchDashboard());
-			_menu.Items.Add(new ToolStripSeparator());
-			_menu.Items.Add("Exit", null, (_, _) => ExitThread());
-
 			var trayIcon = LoadTrayIcon();
 			_notifyIcon = new NotifyIcon
 			{
 				Text = "Porthole",
 				Icon = trayIcon ?? SystemIcons.Application,
 				Visible = true,
-				ContextMenuStrip = _menu,
 			};
 
 			_notifyIcon.MouseClick += OnNotifyIconMouseClick;
@@ -69,7 +62,7 @@ internal static class Program
 				return;
 			}
 
-			_flyout ??= new TrayFlyoutForm(_backendService, LaunchDashboard);
+			_flyout ??= new TrayFlyoutForm(_backendService, LaunchDashboard, ExitThread);
 			_flyout.ShowNearTray();
 		}
 
@@ -79,7 +72,6 @@ internal static class Program
 			_flyout = null;
 			_notifyIcon.Visible = false;
 			_notifyIcon.Dispose();
-			_menu.Dispose();
 			_dockerApiServer.Dispose();
 			_imageServer.Dispose();
 			_backendService.Dispose();

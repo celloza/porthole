@@ -35,15 +35,17 @@ internal sealed class TrayFlyoutForm : Form
 
     private readonly WslcBackendService _backendService;
     private readonly Action _openDashboard;
+    private readonly Action _exitTray;
     private readonly System.Windows.Forms.Timer _refreshTimer;
     private Panel _sessionsContainer = null!;
     private Label _headerLabel = null!;
     private Label _sessionCountLabel = null!;
 
-    public TrayFlyoutForm(WslcBackendService backendService, Action openDashboard)
+    public TrayFlyoutForm(WslcBackendService backendService, Action openDashboard, Action exitTray)
     {
         _backendService = backendService;
         _openDashboard = openDashboard;
+        _exitTray = exitTray;
 
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 5000 };
         _refreshTimer.Tick += (_, _) => Refresh_();
@@ -154,14 +156,47 @@ internal sealed class TrayFlyoutForm : Form
             Padding = new Padding(CardPadding, 8, CardPadding, 8),
         };
 
+        var footerTable = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            BackColor = BackgroundColor,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+        };
+        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+        footerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+        footerTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
         var openButton = CreateStyledButton("Open Dashboard", AccentColor, true);
         openButton.Dock = DockStyle.Fill;
+        openButton.Margin = new Padding(0, 0, 6, 0);
         openButton.Click += (_, _) =>
         {
             Hide();
             _openDashboard();
         };
-        footer.Controls.Add(openButton);
+
+        var closeFooterButton = CreateStyledButton("Close", Color.FromArgb(60, 60, 60), false);
+        closeFooterButton.Dock = DockStyle.Fill;
+        closeFooterButton.Margin = new Padding(0, 0, 6, 0);
+        closeFooterButton.Click += (_, _) => Hide();
+
+        var exitButton = CreateStyledButton("Exit", DangerColor, false);
+        exitButton.Dock = DockStyle.Fill;
+        exitButton.Margin = new Padding(0);
+        exitButton.Click += (_, _) =>
+        {
+            Hide();
+            _exitTray();
+        };
+
+        footerTable.Controls.Add(openButton, 0, 0);
+        footerTable.Controls.Add(closeFooterButton, 1, 0);
+        footerTable.Controls.Add(exitButton, 2, 0);
+        footer.Controls.Add(footerTable);
 
         Controls.Add(_sessionsContainer);
         Controls.Add(bottomSeparator);
