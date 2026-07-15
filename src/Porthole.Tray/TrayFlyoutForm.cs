@@ -25,6 +25,7 @@ internal sealed class TrayFlyoutForm : Form
     private static readonly Color TextPrimary = Color.FromArgb(242, 242, 242);
     private static readonly Color TextSecondary = Color.FromArgb(160, 160, 160);
     private static readonly Color SeparatorColor = Color.FromArgb(55, 55, 55);
+    private static readonly Color SecondaryButtonColor = Color.FromArgb(55, 55, 55);
 
     private const int FlyoutWidth = 330;
     private const int HeaderHeight = 48;
@@ -179,7 +180,7 @@ internal sealed class TrayFlyoutForm : Form
             _openDashboard();
         };
 
-        var closeFooterButton = CreateStyledButton("Close", Color.FromArgb(60, 60, 60), false);
+        var closeFooterButton = CreateStyledButton("Close", SecondaryButtonColor, false);
         closeFooterButton.Dock = DockStyle.Fill;
         closeFooterButton.Margin = new Padding(0, 0, 6, 0);
         closeFooterButton.Click += (_, _) => Hide();

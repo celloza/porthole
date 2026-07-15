@@ -112,17 +112,28 @@ public sealed class NamedPipeSessionService : ISessionService
         if (_lastKnownSessions.Count != newSessions.Count)
             return true;
 
-        // Check if any session names changed
-        var lastNames = _lastKnownSessions.Select(s => s.Name).OrderBy(n => n).ToList();
-        var newNames = newSessions.Select(s => s.Name).OrderBy(n => n).ToList();
+        // Collect names and active session in a single pass over each list.
+        string? lastActive = null;
+        var lastNames = new List<string>(_lastKnownSessions.Count);
+        foreach (SessionSummary s in _lastKnownSessions)
+        {
+            lastNames.Add(s.Name);
+            if (s.IsActive) lastActive = s.Name;
+        }
 
-        if (!lastNames.SequenceEqual(newNames))
-            return true;
+        string? newActive = null;
+        var newNames = new List<string>(newSessions.Count);
+        foreach (SessionSummary s in newSessions)
+        {
+            newNames.Add(s.Name);
+            if (s.IsActive) newActive = s.Name;
+        }
 
-        // Also check if the active session changed (e.g. switched via the tray flyout)
-        string? lastActive = _lastKnownSessions.FirstOrDefault(s => s.IsActive)?.Name;
-        string? newActive = newSessions.FirstOrDefault(s => s.IsActive)?.Name;
-        return !string.Equals(lastActive, newActive, StringComparison.OrdinalIgnoreCase);
+        lastNames.Sort(StringComparer.OrdinalIgnoreCase);
+        newNames.Sort(StringComparer.OrdinalIgnoreCase);
+
+        return !lastNames.SequenceEqual(newNames, StringComparer.OrdinalIgnoreCase)
+            || !string.Equals(lastActive, newActive, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnSessionsChanged()
