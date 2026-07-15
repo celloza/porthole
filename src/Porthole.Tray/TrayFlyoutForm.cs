@@ -205,14 +205,17 @@ internal sealed class TrayFlyoutForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        Refresh_();
-        _refreshTimer.Start();
     }
 
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
-        if (!Visible)
+        if (Visible)
+        {
+            Refresh_();
+            _refreshTimer.Start();
+        }
+        else
         {
             _refreshTimer.Stop();
         }
@@ -308,7 +311,7 @@ internal sealed class TrayFlyoutForm : Form
         }
 
         _sessionsContainer.SuspendLayout();
-        _sessionsContainer.Controls.Clear();
+        ClearAndDisposeChildControls(_sessionsContainer);
 
         if (snapshots.Count == 0)
         {
@@ -338,6 +341,16 @@ internal sealed class TrayFlyoutForm : Form
 
         _sessionsContainer.ResumeLayout(true);
         PositionNearTray();
+    }
+
+    private static void ClearAndDisposeChildControls(Control parent)
+    {
+        while (parent.Controls.Count > 0)
+        {
+            Control child = parent.Controls[0];
+            parent.Controls.RemoveAt(0);
+            child.Dispose();
+        }
     }
 
     private Panel CreateSessionCard(SessionSnapshot snapshot)

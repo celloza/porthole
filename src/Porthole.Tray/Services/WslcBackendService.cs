@@ -111,24 +111,32 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     {
         lock (_syncLock)
         {
-            if (!_sessions.TryGetValue(name, out Session? session))
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException($"Session '{name}' does not exist.");
+                throw new InvalidOperationException($"Cannot pause the default unnamed session '{normalizedName}'.");
+            }
+
+            if (!_sessions.TryGetValue(normalizedName, out Session? session))
+            {
+                throw new InvalidOperationException($"Session '{normalizedName}' does not exist.");
             }
 
             // Terminate the WSL VM to free resources; settings and VHD are preserved for Resume.
             try { session.Terminate(); } catch { }
             session.Dispose();
-            _sessions.Remove(name);
-            _sessionStatuses[name] = "Stopped";
+            _sessions.Remove(normalizedName);
+            _sessionStatuses[normalizedName] = "Stopped";
 
             // If this was the active session, prefer switching to another running session.
             // If none are available, keep _activeSessionName pointing to the paused session name
             // so GetActiveSessionInstance() auto-recreates it on the next operation that needs it.
-            if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedName, _activeSessionName, StringComparison.OrdinalIgnoreCase))
             {
-                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? name;
+                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? normalizedName;
             }
+
+            SaveRegistryLocked();
         }
     }
 
@@ -136,24 +144,27 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     {
         lock (_syncLock)
         {
-            if (_sessions.ContainsKey(name))
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot resume the default unnamed session '{normalizedName}'.");
+            }
+
+            if (_sessions.ContainsKey(normalizedName))
             {
                 // Already running; update status in case it drifted.
-                _sessionStatuses[name] = "Running";
+                _sessionStatuses[normalizedName] = "Running";
                 return;
             }
 
-            if (!_sessionSettings.ContainsKey(name))
+            if (!_sessionSettings.ContainsKey(normalizedName))
             {
-                throw new InvalidOperationException($"Session '{name}' settings not found. The session may have been terminated.");
+                throw new InvalidOperationException($"Session '{normalizedName}' settings not found. The session may have been terminated.");
             }
 
-            // Recreate the WSL VM using the existing VHD storage path.
-            var settings = CreateDefaultSessionSettings(name);
-            var session = new Session(settings);
-            session.Start();
-            _sessions[name] = session;
-            _sessionStatuses[name] = "Running";
+            EnsureSessionInitialized(normalizedName);
+            _sessionStatuses[normalizedName] = "Running";
+            SaveRegistryLocked();
         }
     }
 
@@ -161,20 +172,29 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     {
         lock (_syncLock)
         {
-            if (_sessions.TryGetValue(name, out Session? session))
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
             {
-                _sessions.Remove(name);
+                throw new InvalidOperationException($"Cannot terminate the default unnamed session '{normalizedName}'.");
+            }
+
+            if (_sessions.TryGetValue(normalizedName, out Session? session))
+            {
+                _sessions.Remove(normalizedName);
                 try { session.Terminate(); } catch { }
                 session.Dispose();
             }
 
-            _sessionSettings.Remove(name);
-            _sessionStatuses.Remove(name);
+            _sessionSettings.Remove(normalizedName);
+            _sessionStatuses.Remove(normalizedName);
 
-            if (string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedName, _activeSessionName, StringComparison.OrdinalIgnoreCase))
             {
-                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? "Porthole";
+                _activeSessionName = GetFallbackActiveSessionNameLocked(normalizedName);
+                EnsureSessionInitialized(_activeSessionName);
             }
+
+            SaveRegistryLocked();
         }
     }
 
@@ -1482,6 +1502,30 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             return "(default)";
         }
         return Path.Combine(_baseStoragePath, sessionName);
+    }
+
+    private string GetFallbackActiveSessionNameLocked(string removedSessionName)
+    {
+        string? otherNamedSession = _sessionSettings.Keys
+            .Concat(_sessions.Keys)
+            .Where(name => !string.IsNullOrWhiteSpace(name)
+                && !string.Equals(name, removedSessionName, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(name, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(otherNamedSession))
+        {
+            return otherNamedSession;
+        }
+
+        bool hasDefaultSession = _sessionSettings.ContainsKey(UnnamedDefaultSessionName)
+            || _sessions.ContainsKey(UnnamedDefaultSessionName);
+        if (hasDefaultSession)
+        {
+            return UnnamedDefaultSessionName;
+        }
+
+        return DefaultActiveSessionName;
     }
 
     public DateTimeOffset GetActiveSessionCreatedAtUtc()

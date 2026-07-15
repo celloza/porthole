@@ -51,7 +51,7 @@ internal static class Program
 			};
 
 			_notifyIcon.MouseClick += OnNotifyIconMouseClick;
-			_notifyIcon.DoubleClick += (_, _) => LaunchDashboard();
+			_notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
 			LaunchDashboard();
 		}
 
@@ -64,6 +64,12 @@ internal static class Program
 
 			_flyout ??= new TrayFlyoutForm(_backendService, LaunchDashboard, ExitThread);
 			_flyout.ShowNearTray();
+		}
+
+		private void OnNotifyIconDoubleClick(object? sender, EventArgs e)
+		{
+			_flyout?.Hide();
+			LaunchDashboard();
 		}
 
 		protected override void ExitThreadCore()
