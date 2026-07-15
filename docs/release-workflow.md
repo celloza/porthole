@@ -12,15 +12,15 @@ This document explains how Porthole publishes MSI installer releases using GitHu
 2. Builds the WiX MSI installer from `src/Porthole.Installer/Porthole.Installer.wixproj`.
 3. Creates release assets:
    - `Porthole-<tag>-x64.msi`
+   - `Porthole-<tag>-arm64.msi`
    - `sha256.txt`
 4. Uploads artifacts to the workflow run.
 5. Creates or updates a GitHub Release and attaches the MSI + hash file.
-6. Uses `wingetcreate update --out ...` against the published MSI URL to generate an updated WinGet manifest set in CI.
-7. Validates the generated manifest directory with `winget validate --manifest`.
-8. Submits that generated manifest directory to `microsoft/winget-pkgs`.
+6. Verifies each installer URL is available on the GitHub Release (retries up to 12 times).
+7. Runs `wingetcreate update --urls <url|arch> ... --submit` to generate an updated WinGet manifest and submit it directly to `microsoft/winget-pkgs`.
 
 Notes:
-- The package file name is derived from the release tag (example: `v0.2.0-rc.1` -> `Porthole-v0.2.0-rc.1-x64.msi`).
+- Package file names are derived from the release tag and architecture (example: `v0.2.0-rc.1` -> `Porthole-v0.2.0-rc.1-x64.msi` and `Porthole-v0.2.0-rc.1-arm64.msi`).
 - MSI `ProductVersion` is derived from the numeric core of the tag (`0.2.0` for `v0.2.0-rc.1`) because Windows Installer requires numeric product versions.
 - The WinGet workflow generates manifests in the runner temp directory from the GitHub Release MSI URL.
 - The first accepted submission is tracked in [issue #24](https://github.com/celloza/porthole/issues/24); subsequent releases use `wingetcreate update` only.
@@ -106,7 +106,8 @@ git push origin v1.2.3
 3. In GitHub, draft/publish a Release for that tag.
 4. Wait for the `Release Installer` action to finish.
 5. Verify the GitHub Release contains:
-   - MSI file
+   - x64 MSI file
+   - ARM64 MSI file
    - `sha256.txt`
 6. Verify the workflow generated and validated a WinGet manifest set from the release MSI URL.
 7. If `WINGETCREATE_TOKEN` is configured, verify the workflow also submitted the manifest to `microsoft/winget-pkgs`.
@@ -128,6 +129,12 @@ Per-user install (non-admin) with defaults:
 
 ```powershell
 msiexec /i "Porthole-v0.2.0-x64.msi" /qn
+```
+
+On ARM64 machines, install the ARM64 package instead:
+
+```powershell
+msiexec /i "Porthole-v0.2.0-arm64.msi" /qn
 ```
 
 Per-user install that runs Porthole immediately and enables startup:

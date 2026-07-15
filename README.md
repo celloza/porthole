@@ -185,23 +185,15 @@ See [docs/volume-management.md](docs/volume-management.md) for behavior details 
 
 ### Sessions
 
-Isolated container environments for multi-tenant and workload grouping scenarios:
+Isolated container environments for multi-tenant and workload grouping. Create named sessions to group containers, switch between them, and keep workloads separate. The `(Default)` session represents pre-existing containers in the unnamed WSL session.
 
-**Session Lifecycle**
-- **Create Session**: Launch a new isolated session with a custom name (auto-generates storage directory)
-- **Active Session**: All image and container operations target the active session context
-- **Switch Active Session**: Designate which session is the active context (containers persist in their session)
-- **Delete Session**: Remove an inactive session and all its containers (safety confirmation required)
+**Key Features:**
+- Create, switch, and delete named sessions
+- View active session status and storage location
+- Session-aware operations for all container and image management
+- Automatic discovery of the `(Default)` session when containers exist
 
-**Session Listing**
-- View all available sessions with metadata (name, storage path, active status)
-- Visual indicator for the currently active session
-- Storage path shows where session state and containers are persisted
-
-**Session Switching Toolbar** 🆕
-- A session toolbar is shown at the bottom of the main content column on app pages
-- Uses the sessions icon to keep the active session context visible without opening the Sessions page
-- Quick actions allow refreshing session state or opening the full Sessions management page
+> **📖 For comprehensive session management documentation, see [Session Management](docs/sessions.md)**
 
 <div align="center">
   <picture>
@@ -404,6 +396,8 @@ Porthole includes a WiX v4 installer project intended for winget-friendly distri
 
 ```powershell
 dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=1.0.0 -p:Platform=x64
+# or
+dotnet build src/Porthole.Installer/Porthole.Installer.wixproj -c Release -p:ProductVersion=1.0.0 -p:Platform=arm64
 ```
 
 What this does:

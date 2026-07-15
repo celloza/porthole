@@ -49,7 +49,8 @@ public class ViewModelTests
     public void ContainersViewModel_ApplyCatalogUpdate_UpdatesCountsAndPodTree()
     {
         var service = new FakeContainerCatalogService();
-        var viewModel = new ContainersViewModel(service);
+        var sessionService = new FakeSessionService();
+        var viewModel = new ContainersViewModel(service, sessionService);
 
         var containers = new List<ContainerSummary>
         {
@@ -205,7 +206,8 @@ public class ViewModelTests
     public void ContainersViewModel_AllRunning_ShowsCorrectStatus()
     {
         var service = new FakeContainerCatalogService();
-        var viewModel = new ContainersViewModel(service);
+        var sessionService = new FakeSessionService();
+        var viewModel = new ContainersViewModel(service, sessionService);
 
         var containers = new List<ContainerSummary>
         {
@@ -237,7 +239,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         Assert.Equal(0, viewModel.CurrentStep);
         Assert.True(viewModel.IsTemplateChoiceStep);
@@ -258,7 +261,8 @@ public class ViewModelTests
 
         var imageService = new FakeImageCatalogService(images);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         await viewModel.LoadImagesAsync();
         viewModel.StartNewConfiguration();
@@ -273,7 +277,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -293,7 +298,8 @@ public class ViewModelTests
 
         var imageService = new FakeImageCatalogService(images);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         await viewModel.LoadImagesAsync();
         viewModel.StartNewConfiguration();
@@ -311,7 +317,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -329,7 +336,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -345,7 +353,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -361,7 +370,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -377,7 +387,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -394,7 +405,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -410,7 +422,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -427,7 +440,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -444,7 +458,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -465,7 +480,8 @@ public class ViewModelTests
 
         var imageService = new FakeImageCatalogService(images);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         await viewModel.LoadImagesAsync();
         viewModel.StartNewConfiguration();
@@ -484,7 +500,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
 
@@ -509,7 +526,8 @@ public class ViewModelTests
 
         var imageService = new FakeImageCatalogService(images);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         await viewModel.LoadImagesAsync();
 
@@ -542,7 +560,8 @@ public class ViewModelTests
 
         var imageService = new FakeImageCatalogService(images);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         await viewModel.LoadImagesAsync();
         viewModel.StartNewConfiguration();
@@ -698,7 +717,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.NewVolumeMount = "C:\\data:/app/data:ro";
         Assert.Contains("virtiofs", viewModel.NewVolumeMountTelemetry, StringComparison.OrdinalIgnoreCase);
@@ -712,7 +732,8 @@ public class ViewModelTests
     {
         var imageService = new FakeImageCatalogService([]);
         var containerService = new FakeContainerCatalogService();
-        var viewModel = new RunWizardViewModel(imageService, containerService);
+        var sessionService = new FakeSessionService();
+        var viewModel = new RunWizardViewModel(imageService, containerService, sessionService);
 
         viewModel.StartNewConfiguration();
         viewModel.ContainerName = "api";
@@ -808,6 +829,8 @@ public class ViewModelTests
             new("staging", "/var/lib/wsl/sessions/staging", false),
         ];
 
+        public event EventHandler? SessionsChanged;
+
         public Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult<IReadOnlyList<SessionSummary>>(_sessions);
@@ -816,6 +839,7 @@ public class ViewModelTests
         public Task CreateSessionAsync(string name, CancellationToken cancellationToken = default)
         {
             _sessions.Add(new(name, $"/var/lib/wsl/sessions/{name}", false));
+            SessionsChanged?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
@@ -824,6 +848,7 @@ public class ViewModelTests
             var session = _sessions.FirstOrDefault(s => s.Name == name && !s.IsActive);
             if (session != null)
                 _sessions.Remove(session);
+            SessionsChanged?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
@@ -831,12 +856,23 @@ public class ViewModelTests
         {
             for (int i = 0; i < _sessions.Count; i++)
                 _sessions[i] = _sessions[i] with { IsActive = _sessions[i].Name == name };
+            SessionsChanged?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
         public Task<string> GetActiveSessionNameAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_sessions.FirstOrDefault(session => session.IsActive)?.Name ?? string.Empty);
+        }
+
+        public void StartWatchingForChanges(CancellationToken cancellationToken = default)
+        {
+            // Fake implementation - no-op for tests
+        }
+
+        public void StopWatchingForChanges()
+        {
+            // Fake implementation - no-op for tests
         }
 
         public Task PauseSessionAsync(string name, CancellationToken cancellationToken = default)

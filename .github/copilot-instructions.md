@@ -161,4 +161,32 @@ When discovering port bindings or other container metadata:
 - When creating/switching sessions, create new Session instance and store in `_sessions` dictionary
 - Session.Settings is not exposed by SDK → use `_sessionSettings` dictionary to track name→storagePath mappings
 - Session lifetime: Created on demand when referenced, persists until deleted
-- **Limitation**: Active session resets when tray restarts (session name is not persisted to disk)
+- Sessions are persisted to registry at `%LOCALAPPDATA%\Porthole\sessions.json` containing `activeSessionName` and `knownSessionNames` array
+- **Active session persists across tray restarts** via registry (changed from previous behavior)
+
+### The (Default) Session
+
+The `(Default)` session (represented by constant `UnnamedDefaultSessionName = "(Default)"`) represents the unnamed default WSL Containers session:
+
+**When it appears:**
+- On first run (no registry): If existing containers are detected in the default unnamed session via `wslc container list --all --format json`
+- On upgrade or registry deletion: If named sessions exist on disk AND the default session has containers
+
+**Key differences from named sessions:**
+- Cannot be deleted via `DeleteNamedSession()` (throws InvalidOperationException)
+- Commands use no `--session` parameter: `wslc list --all --format json` instead of `wslc --session Default list --all --format json`
+- `GetSessionStoragePath("(Default)")` returns `"(default)"` (not a real filesystem path)
+- `EnsureSessionInitialized("(Default)")` skips Session SDK initialization since WSL manages it
+- Storage path is `"(default)"` indicating WSL-managed storage, not user-created
+
+**Session selection priority on first run:**
+1. Other named sessions (not Default, not porthole-devcontainers) if any exist
+2. (Default) session if it has containers
+3. First discovered named session (alphabetically)
+4. porthole-devcontainers (hardcoded default if nothing else exists)
+
+**Implementation details:**
+- `HasDefaultUnnamedSessionOnFirstRun()` runs `wslc container list --all --format json` to detect if default session has containers
+- `skipDefaultSessionDetection` parameter in constructor (used by tests) prevents this check
+- `BuildSessionScopedWslcArguments()` checks if session name equals `UnnamedDefaultSessionName` and omits `--session` parameter if true
+

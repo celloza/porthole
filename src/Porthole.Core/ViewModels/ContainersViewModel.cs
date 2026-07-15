@@ -11,8 +11,11 @@ namespace Porthole.Core.ViewModels;
 public partial class ContainersViewModel : ObservableObject
 {
     private readonly IContainerCatalogService _containerCatalogService;
+    private readonly ISessionService _sessionService;
     private string? _lastSelectedContainerId;
     private readonly bool _isElevated;
+
+    public event EventHandler? SessionChanged;
 
     public ObservableCollection<ContainerSummary> Containers { get; } = [];
 
@@ -28,10 +31,17 @@ public partial class ContainersViewModel : ObservableObject
     [ObservableProperty]
     private string podTreeText = "(loading pods...)";
 
-    public ContainersViewModel(IContainerCatalogService containerCatalogService)
+    public ContainersViewModel(IContainerCatalogService containerCatalogService, ISessionService sessionService)
     {
         _containerCatalogService = containerCatalogService;
+        _sessionService = sessionService;
         _isElevated = DetectIsElevated();
+        _sessionService.SessionsChanged += OnSessionsChanged;
+    }
+
+    private void OnSessionsChanged(object? sender, EventArgs e)
+    {
+        SessionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public bool IsElevated => _isElevated;

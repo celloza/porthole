@@ -20,6 +20,16 @@ public sealed partial class ContainersPage : Page
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        ViewModel.SessionChanged += OnSessionChanged;
+    }
+
+    private void OnSessionChanged(object? sender, EventArgs e)
+    {
+        // Restart the subscription loop when the session changes
+        _subscriptionCancellationSource?.Cancel();
+        _subscriptionCancellationSource?.Dispose();
+        _subscriptionCancellationSource = new CancellationTokenSource();
+        _subscriptionTask = RunSubscriptionLoopAsync(_subscriptionCancellationSource.Token);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
