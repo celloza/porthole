@@ -182,8 +182,10 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     {
         lock (_syncLock)
         {
-            // Include all known sessions: running ones in _sessions plus any paused ones tracked in _sessionStatuses.
-            var allNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Use the same name source as ListSessions() so all known sessions are visible,
+            // including the (Default) session (which is never added to _sessions) and
+            // non-active sessions that have not been started since the last tray boot.
+            var allNames = new HashSet<string>(GetKnownSessionNamesLocked(), StringComparer.OrdinalIgnoreCase);
             allNames.UnionWith(_sessions.Keys);
             allNames.UnionWith(_sessionStatuses.Keys);
 
@@ -192,7 +194,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
                 {
                     string status = _sessionStatuses.TryGetValue(name, out string? s)
                         ? s
-                        : _sessions.ContainsKey(name) ? "Running" : "Unknown";
+                        : _sessions.ContainsKey(name) ? "Running" : "Stopped";
 
                     return new SessionSnapshot(
                         name,
