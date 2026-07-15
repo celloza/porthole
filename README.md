@@ -62,6 +62,7 @@ Alternatively, download the `.msi` installer from [GitHub Releases](https://gith
 - ✅ **Images**: pull, tag, and delete container images
 - ✅ **Containers**: start, stop, and remove containers
 - ✅ **Sessions**: create and manage isolated session environments for workload grouping
+- ✅ **Tray Flyout Quick Switch**: left- or right-click the tray icon to open a compact session switcher with session actions
 - ✅ **VS Code Integration**: Docker-compatible API bridging for the Containers extension plus a Dev Containers CLI shim
 - ✅ **Networking**: configure network mode (bridge vs. consomme) and inspect active port bindings and host proxy configuration
 - ✅ **Volume Management**: inspect named volumes and bind mounts, surface virtiofs telemetry, and create/delete/prune named volumes
@@ -202,6 +203,24 @@ Isolated container environments for multi-tenant and workload grouping. Create n
   </picture>
 </div>
 
+### Tray Flyout Quick Switch
+
+The tray flyout provides a fast way to review and manage sessions without opening the full dashboard.
+
+**Quick actions:**
+- Open the flyout with a left-click or right-click on the tray icon
+- See session status at a glance
+- Set a session as active
+- Pause, resume, or terminate sessions
+- Open the full dashboard when deeper changes are needed
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/flyout.png">
+    <img alt="tray flyout quick switch panel" src="assets/flyout.png" width="420">
+  </picture>
+</div>
+
 
 
 ### Run Wizard
@@ -298,6 +317,7 @@ Alternatively, download the `.msi` installer from [GitHub Releases](https://gith
 
 - [docs/volume-management.md](docs/volume-management.md): named volumes, bind mounts, virtiofs telemetry, and run-wizard mount guidance
 - [docs/release-workflow.md](docs/release-workflow.md): installer and GitHub release flow
+- [docs/sessions.md](docs/sessions.md): session lifecycle, `(Default)` session behavior, and tray quick switching
 - [docs/vscode-integration.md](docs/vscode-integration.md): Docker API bridge, Dev Containers shim, VS Code settings, and session-scoped `wslc` behavior
 
 ## Prerequisites
@@ -370,7 +390,7 @@ dotnet run --project src/Porthole.Tray -c Debug
 
 The tray host resolves the dashboard path by preferring the repository app build output and avoids activating mismatched stale `Porthole.App.exe` instances from unrelated locations.
 
-The tray host starts a named pipe server and automatically launches the dashboard. You can then reopen the dashboard by double-clicking the tray icon.
+The tray host starts a named pipe server and automatically launches the dashboard. You can open the tray flyout with a left-click or right-click on the tray icon, and reopen the dashboard by double-clicking the tray icon.
 
 **Alternative: Run components separately**
 

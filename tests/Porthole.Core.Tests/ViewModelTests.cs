@@ -874,6 +874,32 @@ public class ViewModelTests
         {
             // Fake implementation - no-op for tests
         }
+
+        public Task PauseSessionAsync(string name, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ResumeSessionAsync(string name, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task TerminateSessionAsync(string name, CancellationToken cancellationToken = default)
+        {
+            var session = _sessions.FirstOrDefault(s => s.Name == name);
+            if (session != null)
+                _sessions.Remove(session);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<SessionSnapshot>> GetTraySnapshotAsync(CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<SessionSnapshot> snapshots = _sessions
+                .Select(s => new SessionSnapshot(s.Name, s.IsActive, "Running", string.Empty, string.Empty))
+                .ToList();
+            return Task.FromResult(snapshots);
+        }
     }
 
     private sealed class FakeNetworkingService : INetworkingService

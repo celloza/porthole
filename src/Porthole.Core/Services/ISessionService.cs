@@ -13,4 +13,8 @@ public interface ISessionService
     Task<string> GetActiveSessionNameAsync(CancellationToken cancellationToken = default);
     void StartWatchingForChanges(CancellationToken cancellationToken = default);
     void StopWatchingForChanges();
+    Task PauseSessionAsync(string name, CancellationToken cancellationToken = default);
+    Task ResumeSessionAsync(string name, CancellationToken cancellationToken = default);
+    Task TerminateSessionAsync(string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SessionSnapshot>> GetTraySnapshotAsync(CancellationToken cancellationToken = default);
 }

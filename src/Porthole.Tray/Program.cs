@@ -28,22 +28,19 @@ internal static class Program
 	{
 		private readonly DockerApiServer _dockerApiServer;
 		private readonly NamedPipeImageCatalogServer _imageServer;
-		private readonly ContextMenuStrip _menu;
+		private readonly WslcBackendService _backendService;
 		private readonly NotifyIcon _notifyIcon;
+		private TrayFlyoutForm? _flyout;
 
 		public TrayApplicationContext()
 		{
 			var configurationStore = new TrayConfigurationStore();
 			TrayConfiguration configuration = configurationStore.Load();
-			var backendService = new WslcBackendService();
-			_imageServer = new NamedPipeImageCatalogServer(backendService);
-			_dockerApiServer = new DockerApiServer(backendService, configuration.DockerApi);
+			_backendService = new WslcBackendService();
+			_imageServer = new NamedPipeImageCatalogServer(_backendService);
+			_dockerApiServer = new DockerApiServer(_backendService, configuration.DockerApi);
 			_imageServer.Start();
 			_dockerApiServer.Start();
-
-			_menu = new ContextMenuStrip();
-			_menu.Items.Add("Open dashboard", null, (_, _) => LaunchDashboard());
-			_menu.Items.Add("Exit", null, (_, _) => ExitThread());
 
 			var trayIcon = LoadTrayIcon();
 			_notifyIcon = new NotifyIcon
@@ -51,20 +48,39 @@ internal static class Program
 				Text = "Porthole",
 				Icon = trayIcon ?? SystemIcons.Application,
 				Visible = true,
-				ContextMenuStrip = _menu,
 			};
 
-			_notifyIcon.DoubleClick += (_, _) => LaunchDashboard();
+			_notifyIcon.MouseClick += OnNotifyIconMouseClick;
+			_notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
+			LaunchDashboard();
+		}
+
+		private void OnNotifyIconMouseClick(object? sender, MouseEventArgs e)
+		{
+			if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right)
+			{
+				return;
+			}
+
+			_flyout ??= new TrayFlyoutForm(_backendService, LaunchDashboard, ExitThread);
+			_flyout.ShowNearTray();
+		}
+
+		private void OnNotifyIconDoubleClick(object? sender, EventArgs e)
+		{
+			_flyout?.Hide();
 			LaunchDashboard();
 		}
 
 		protected override void ExitThreadCore()
 		{
+			_flyout?.Dispose();
+			_flyout = null;
 			_notifyIcon.Visible = false;
 			_notifyIcon.Dispose();
-			_menu.Dispose();
 			_dockerApiServer.Dispose();
 			_imageServer.Dispose();
+			_backendService.Dispose();
 			base.ExitThreadCore();
 		}
 	}

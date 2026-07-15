@@ -112,15 +112,66 @@ public sealed class NamedPipeSessionService : ISessionService
         if (_lastKnownSessions.Count != newSessions.Count)
             return true;
 
-        // Check if any session names changed
-        var lastNames = _lastKnownSessions.Select(s => s.Name).OrderBy(n => n).ToList();
-        var newNames = newSessions.Select(s => s.Name).OrderBy(n => n).ToList();
+        // Collect names and active session in a single pass over each list.
+        string? lastActive = null;
+        var lastNames = new List<string>(_lastKnownSessions.Count);
+        foreach (SessionSummary s in _lastKnownSessions)
+        {
+            lastNames.Add(s.Name);
+            if (s.IsActive) lastActive = s.Name;
+        }
 
-        return !lastNames.SequenceEqual(newNames);
+        string? newActive = null;
+        var newNames = new List<string>(newSessions.Count);
+        foreach (SessionSummary s in newSessions)
+        {
+            newNames.Add(s.Name);
+            if (s.IsActive) newActive = s.Name;
+        }
+
+        lastNames.Sort(StringComparer.OrdinalIgnoreCase);
+        newNames.Sort(StringComparer.OrdinalIgnoreCase);
+
+        return !lastNames.SequenceEqual(newNames, StringComparer.OrdinalIgnoreCase)
+            || !string.Equals(lastActive, newActive, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnSessionsChanged()
     {
         SessionsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task PauseSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.PauseSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task ResumeSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.ResumeSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task TerminateSessionAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.TerminateSession, SessionName: name),
+            progress: null,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SessionSnapshot>> GetTraySnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await NamedPipeImageCatalogService.SendRequestAsync(
+            new ImageCatalogRequest(ImageCatalogOperation.GetTraySnapshot),
+            progress: null,
+            cancellationToken);
+
+        return response.TraySnapshots ?? [];
     }
 }

@@ -41,6 +41,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
     private readonly object _syncLock = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _sessionSettings = new(StringComparer.OrdinalIgnoreCase); // name -> storagePath
+    private readonly Dictionary<string, string> _sessionStatuses = new(StringComparer.OrdinalIgnoreCase); // name -> "Running"|"Stopped"
     private readonly string _baseStoragePath;
     private readonly string _sessionRegistryPath;
     private readonly bool _skipDefaultSessionDetection;
@@ -74,6 +75,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         lock (_syncLock)
         {
             EnsureSessionInitialized(name);
+            _sessionStatuses[name] = "Running";
             SaveRegistryLocked();
         }
     }
@@ -100,7 +102,130 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             }
 
             _sessionSettings.Remove(name);
+            _sessionStatuses.Remove(name);
             SaveRegistryLocked();
+        }
+    }
+
+    public void PauseSession(string name)
+    {
+        lock (_syncLock)
+        {
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot pause the default unnamed session '{normalizedName}'.");
+            }
+
+            if (!_sessions.TryGetValue(normalizedName, out Session? session))
+            {
+                throw new InvalidOperationException($"Session '{normalizedName}' does not exist.");
+            }
+
+            // Terminate the WSL VM to free resources; settings and VHD are preserved for Resume.
+            try { session.Terminate(); } catch { }
+            session.Dispose();
+            _sessions.Remove(normalizedName);
+            _sessionStatuses[normalizedName] = "Stopped";
+
+            // If this was the active session, prefer switching to another running session.
+            // If none are available, keep _activeSessionName pointing to the paused session name
+            // so GetActiveSessionInstance() auto-recreates it on the next operation that needs it.
+            if (string.Equals(normalizedName, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeSessionName = _sessions.Keys.FirstOrDefault() ?? normalizedName;
+            }
+
+            SaveRegistryLocked();
+        }
+    }
+
+    public void ResumeSession(string name)
+    {
+        lock (_syncLock)
+        {
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot resume the default unnamed session '{normalizedName}'.");
+            }
+
+            if (_sessions.ContainsKey(normalizedName))
+            {
+                // Already running; update status in case it drifted.
+                _sessionStatuses[normalizedName] = "Running";
+                return;
+            }
+
+            if (!_sessionSettings.ContainsKey(normalizedName))
+            {
+                throw new InvalidOperationException($"Session '{normalizedName}' settings not found. The session may have been terminated.");
+            }
+
+            EnsureSessionInitialized(normalizedName);
+            _sessionStatuses[normalizedName] = "Running";
+            SaveRegistryLocked();
+        }
+    }
+
+    public void TerminateNamedSession(string name)
+    {
+        lock (_syncLock)
+        {
+            string normalizedName = name.Trim();
+            if (string.Equals(normalizedName, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot terminate the default unnamed session '{normalizedName}'.");
+            }
+
+            if (_sessions.TryGetValue(normalizedName, out Session? session))
+            {
+                _sessions.Remove(normalizedName);
+                try { session.Terminate(); } catch { }
+                session.Dispose();
+            }
+
+            _sessionSettings.Remove(normalizedName);
+            _sessionStatuses.Remove(normalizedName);
+
+            if (string.Equals(normalizedName, _activeSessionName, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeSessionName = GetFallbackActiveSessionNameLocked(normalizedName);
+                EnsureSessionInitialized(_activeSessionName);
+            }
+
+            SaveRegistryLocked();
+        }
+    }
+
+    public IReadOnlyList<SessionSnapshot> GetTraySnapshot()
+    {
+        lock (_syncLock)
+        {
+            // Use the same name source as ListSessions() so all known sessions are visible,
+            // including the (Default) session (which is never added to _sessions) and
+            // non-active sessions that have not been started since the last tray boot.
+            var allNames = new HashSet<string>(GetKnownSessionNamesLocked(), StringComparer.OrdinalIgnoreCase);
+            allNames.UnionWith(_sessions.Keys);
+            allNames.UnionWith(_sessionStatuses.Keys);
+
+            return allNames
+                .Select(name =>
+                {
+                    string status = _sessionStatuses.TryGetValue(name, out string? s)
+                        ? s
+                        : _sessions.ContainsKey(name) ? "Running" : "Stopped";
+
+                    return new SessionSnapshot(
+                        name,
+                        string.Equals(name, _activeSessionName, StringComparison.OrdinalIgnoreCase),
+                        status,
+                        CpuUsage: string.Empty,
+                        MemoryUsage: string.Empty);
+                })
+                .OrderByDescending(s => s.IsActive)
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
     }
 
@@ -1159,6 +1284,7 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
         lock (_syncLock)
         {
             EnsureSessionInitialized(_activeSessionName);
+            _sessionStatuses[_activeSessionName] = "Running";
             return _sessions[_activeSessionName];
         }
     }
@@ -1376,6 +1502,30 @@ internal sealed class WslcBackendService : IDisposable, IDockerApiBackend
             return "(default)";
         }
         return Path.Combine(_baseStoragePath, sessionName);
+    }
+
+    private string GetFallbackActiveSessionNameLocked(string removedSessionName)
+    {
+        string? otherNamedSession = _sessionSettings.Keys
+            .Concat(_sessions.Keys)
+            .Where(name => !string.IsNullOrWhiteSpace(name)
+                && !string.Equals(name, removedSessionName, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(name, UnnamedDefaultSessionName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(otherNamedSession))
+        {
+            return otherNamedSession;
+        }
+
+        bool hasDefaultSession = _sessionSettings.ContainsKey(UnnamedDefaultSessionName)
+            || _sessions.ContainsKey(UnnamedDefaultSessionName);
+        if (hasDefaultSession)
+        {
+            return UnnamedDefaultSessionName;
+        }
+
+        return DefaultActiveSessionName;
     }
 
     public DateTimeOffset GetActiveSessionCreatedAtUtc()

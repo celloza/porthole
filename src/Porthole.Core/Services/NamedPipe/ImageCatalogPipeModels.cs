@@ -29,6 +29,12 @@ public enum ImageCatalogOperation
     // Container creation
     CreateContainer = 25,
 
+    // Session quick controls (tray flyout)
+    PauseSession = 26,
+    ResumeSession = 27,
+    TerminateSession = 28,
+    GetTraySnapshot = 29,
+
     // Networking
     GetNetworkingSnapshot = 30,
     SetNetworkMode = 31,
@@ -73,4 +79,5 @@ public sealed record ImageCatalogResponse(
     IReadOnlyList<SessionSummary>? Sessions = null,
     NetworkingSnapshot? NetworkingSnapshot = null,
     IReadOnlyList<VolumeSummary>? Volumes = null,
+    IReadOnlyList<SessionSnapshot>? TraySnapshots = null,
     DevContainerCapabilityReport? DevContainerCapability = null);
