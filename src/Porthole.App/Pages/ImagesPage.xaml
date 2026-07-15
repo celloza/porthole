@@ -318,15 +318,22 @@
                                     FontWeight="SemiBold"
                                     Opacity="0.5"
                                     Text="TAG IMAGE" />
-                                <TextBox
-                                    PlaceholderText="local/dev:latest"
-                                    Text="{x:Bind ViewModel.NewTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Command="{x:Bind ViewModel.TagImageCommand}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontSize="12" Glyph="&#xE1CB;" />
-                                        <TextBlock Text="Apply Tag" />
-                                    </StackPanel>
-                                </Button>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox
+                                        Grid.Column="0"
+                                        PlaceholderText="local/dev:latest"
+                                        Text="{x:Bind ViewModel.NewTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Command="{x:Bind ViewModel.TagImageCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontSize="12" Glyph="&#xE1CB;" />
+                                            <TextBlock Text="Apply Tag" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
                             </StackPanel>
 
                             <!--  Delete action section  -->
@@ -338,7 +345,8 @@
                                     Text="DANGER ZONE" />
                                 <Button
                                     Command="{x:Bind ViewModel.DeleteImageCommand}"
-                                    Foreground="{ThemeResource SystemFillColorCriticalBrush}">
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    ToolTipService.ToolTip="Permanently delete this image">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <FontIcon FontSize="12" Glyph="&#xE74D;" />
                                         <TextBlock Text="Delete Image" />

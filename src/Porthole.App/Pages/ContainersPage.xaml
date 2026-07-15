@@ -304,36 +304,42 @@
                                     FontSize="10"
                                     FontWeight="SemiBold"
                                     Opacity="0.5"
-                                    Text="LIFECYCLE" />
-                                <Button Command="{x:Bind ViewModel.StartContainerCommand}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontSize="12" Glyph="&#xE768;" />
-                                        <TextBlock Text="Start Container" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Command="{x:Bind ViewModel.StopContainerCommand}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontSize="12" Glyph="&#xE71A;" />
-                                        <TextBlock Text="Stop Container" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-
-                            <!--  Remove action  -->
-                            <StackPanel Spacing="8">
-                                <TextBlock
-                                    FontSize="10"
-                                    FontWeight="SemiBold"
-                                    Opacity="0.5"
-                                    Text="DANGER ZONE" />
-                                <Button
-                                    Command="{x:Bind ViewModel.RemoveContainerCommand}"
-                                    Foreground="{ThemeResource SystemFillColorCriticalBrush}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontSize="12" Glyph="&#xE74D;" />
-                                        <TextBlock Text="Remove Container" />
-                                    </StackPanel>
-                                </Button>
+                                    Text="ACTIONS" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <!--  Spacer pushes Remove to the trailing edge  -->
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button
+                                        Grid.Column="0"
+                                        Command="{x:Bind ViewModel.StartContainerCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontSize="12" Glyph="&#xE768;" />
+                                            <TextBlock Text="Start" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        Grid.Column="1"
+                                        Command="{x:Bind ViewModel.StopContainerCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontSize="12" Glyph="&#xE71A;" />
+                                            <TextBlock Text="Stop" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button
+                                        Grid.Column="3"
+                                        Command="{x:Bind ViewModel.RemoveContainerCommand}"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        ToolTipService.ToolTip="Remove container">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontSize="12" Glyph="&#xE74D;" />
+                                            <TextBlock Text="Remove" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
                             </StackPanel>
 
                             <!--  Pods tree  -->
