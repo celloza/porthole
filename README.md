@@ -51,6 +51,15 @@ To upgrade an existing installation:
 winget upgrade celloza.Porthole
 ```
 
+> [!NOTE]
+> Current Porthole releases on winget are pre-release (`-alpha`) builds, so `winget upgrade celloza.Porthole` can report `No applicable upgrade found.` When updating, install the target pre-release version explicitly instead:
+>
+> ```powershell
+> winget install celloza.Porthole --version <version> --architecture x64 --force
+> ```
+>
+> Replace `<version>` with the pre-release version you want to install, for example `0.0.10-alpha`.
+
 ### Manual Installation (MSI)
 
 Alternatively, download the `.msi` installer from [GitHub Releases](https://github.com/celloza/porthole/releases) and run it directly.
@@ -301,6 +310,15 @@ To upgrade an existing installation:
 ```powershell
 winget upgrade celloza.Porthole
 ```
+
+> [!NOTE]
+> Current Porthole releases on winget are pre-release (`-alpha`) builds, so `winget upgrade celloza.Porthole` can report `No applicable upgrade found.` When updating, install the target pre-release version explicitly instead:
+>
+> ```powershell
+> winget install celloza.Porthole --version <version> --architecture x64 --force
+> ```
+>
+> Replace `<version>` with the pre-release version you want to install, for example `0.0.10-alpha`.
 
 ### Manual Installation (MSI)
 
